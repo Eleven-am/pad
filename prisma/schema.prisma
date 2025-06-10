@@ -1,0 +1,923 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  bio       String?  @db.Text
+  role      UserRole @default(AUTHOR)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  avatarFileId String?
+  avatarFile   File?   @relation("UserAvatar", fields: [avatarFileId], references: [id])
+
+  website  String?
+  twitter  String?
+  linkedin String?
+  github   String?
+
+  posts         Post[]
+  postReads     PostRead[]
+  postViews     PostView[]
+  likes         PostLike[]
+  bookmarks     PostBookmark[]
+  uploadedFiles File[]
+
+  // Collaboration relationships
+  collaborations PostCollaborator[]
+  invitedCollaborations PostCollaborator[] @relation("CollaboratorInviter")
+  postRevisions PostRevision[]
+
+  emailVerified Boolean
+  image         String?
+  banned        Boolean?
+  banReason     String?
+  banExpires    DateTime?
+  sessions      Session[]
+  accounts      Account[]
+  apikeys       Apikey[]
+
+  @@map("users")
+}
+
+model Post {
+  id          String    @id @default(cuid())
+  title       String
+  slug        String    @unique
+  excerpt     String?
+  published   Boolean   @default(false)
+  publishedAt DateTime?
+  scheduledAt DateTime? // For scheduled publishing
+  featured    Boolean   @default(false) // Featured posts
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  authorId    String
+
+  // SEO metadata
+  metaTitle       String?
+  metaDescription String? @db.Text
+  ogImage         String? // Open Graph image URL
+  canonicalUrl    String? // Canonical URL for SEO
+  focusKeyword    String? // Primary SEO keyword
+
+  // Audio narration
+  audioFileId      String?
+  audioFile        File?       @relation("PostAudio", fields: [audioFileId], references: [id])
+  audioStatus      AudioStatus @default(NOT_GENERATED)
+  audioGeneratedAt DateTime?
+  audioDuration    Int? // Duration in seconds
+
+  // Series relationship
+  seriesId    String?
+  series      PostSeries? @relation(fields: [seriesId], references: [id])
+  seriesOrder Int? // Order within the series
+
+  // Category relationship
+  categoryId String?
+  category   Category? @relation(fields: [categoryId], references: [id])
+
+  // Relationships
+  author User @relation(fields: [authorId], references: [id])
+
+  // Tags relationship
+  postTags PostTag[]
+
+  // Read and engagement tracking
+  postReads PostRead[]
+  postViews PostView[]
+  likes     PostLike[]
+  bookmarks PostBookmark[]
+
+  // Redirects for this post
+  redirectsFrom PostRedirect[]
+
+  // Collaboration relationships
+  collaborators PostCollaborator[]
+  revisions     PostRevision[]
+
+  // Block relationships
+  textBlocks      TextBlock[]
+  videoBlocks     VideoBlock[]
+  quotes          QuoteBlock[]
+  imagesBlocks    ImagesBlock[]
+  callouts        Callout[]
+  codeBlocks      CodeBlock[]
+  tables          TableBlock[]
+  twitterEmbeds   TwitterBlock[]
+  instagramEmbeds InstagramBlock[]
+  progressTracker ProgressTracker?
+  charts          ChartBlock[]
+  listBlocks      ListBlock[]
+  headingBlocks   HeadingBlock[]
+  pollingBlocks   PollingBlock[]
+
+  @@map("posts")
+}
+
+model File {
+  id         String   @id @default(cuid())
+  filename   String // Generated unique filename
+  path       String // Storage path (/uploads/...)
+  mimeType   String // image/jpeg, video/mp4, text/csv, etc.
+  size       Int // File size in bytes
+  uploadedAt DateTime @default(now())
+
+  // References from blocks
+  tableBlocks       TableBlock[]
+  chartBlocks       ChartBlock[] // ADDED: Direct chart → file relationship
+  videoFiles        VideoBlock[]    @relation("VideoFile")
+  posterFiles       VideoBlock[]    @relation("PosterFile")
+  galleryImages     GalleryImage[]
+  twitterImageFiles TwitterBlock[]  @relation("TwitterImageFile")
+  instagramFiles    InstagramFile[]
+  twitterAvatar     TwitterBlock[]  @relation("TwitterAvatar")
+
+  // Post audio narration
+  postAudio Post[] @relation("PostAudio")
+
+  // User avatars
+  userAvatars User[] @relation("UserAvatar")
+
+  // Uploader reference
+  uploaderId String
+  uploader   User   @relation(fields: [uploaderId], references: [id], onDelete: Cascade)
+
+  @@map("files")
+}
+
+model Tag {
+  id          String  @id @default(cuid())
+  name        String  @unique
+  slug        String  @unique
+  description String?
+  color       String? // Hex color for UI display
+
+  postTags PostTag[]
+
+  createdAt DateTime @default(now())
+
+  @@map("tags")
+}
+
+model PostTag {
+  id String @id @default(cuid())
+
+  postId String
+  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  tagId String
+  tag   Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([postId, tagId])
+  @@map("post_tags")
+}
+
+model PostRead {
+  id String @id @default(cuid())
+
+  postId String
+  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  // Optional user tracking (null for anonymous reads)
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  // Tracking data
+  ipAddress String? // For anonymous tracking
+  userAgent String? // Browser info
+  referrer  String? // Where they came from
+  readAt    DateTime @default(now())
+
+  // Reading behavior
+  timeSpent   Int? // Seconds spent reading
+  scrollDepth Float? // Percentage of post scrolled (0.0 - 1.0)
+  completed   Boolean @default(false) // Did they reach the end?
+
+  @@map("post_reads")
+}
+
+model PostView {
+  id String @id @default(cuid())
+
+  postId String
+  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  // Optional user tracking (null for anonymous views)
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  // Tracking data
+  ipAddress String?
+  userAgent String?
+  referrer  String?
+  viewedAt  DateTime @default(now())
+
+  @@map("post_views")
+}
+
+model PostLike {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  postId String
+  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, userId])
+  @@map("post_likes")
+}
+
+model PostBookmark {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  postId String
+  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, userId])
+  @@map("post_bookmarks")
+}
+
+model PostSeries {
+  id          String  @id @default(cuid())
+  title       String
+  slug        String  @unique
+  description String? @db.Text
+
+  posts Post[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("post_series")
+}
+
+model Category {
+  id          String  @id @default(cuid())
+  name        String  @unique
+  slug        String  @unique
+  description String?
+  color       String? // Hex color for UI display
+
+  // Hierarchical categories
+  parentId String?
+  parent   Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children Category[] @relation("CategoryHierarchy")
+
+  posts Post[]
+
+  createdAt DateTime @default(now())
+
+  @@map("categories")
+}
+
+model PostRedirect {
+  id      String @id @default(cuid())
+  fromUrl String @unique // Old URL path
+
+  postId String
+  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@map("post_redirects")
+}
+
+model WebhookEndpoint {
+  id          String   @id @default(cuid())
+  url         String
+  secret      String // For signature verification
+  events      String[] // Array of event types to listen for
+  active      Boolean  @default(true)
+  description String?
+
+  // Delivery tracking
+  deliveries WebhookDelivery[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("webhook_endpoints")
+}
+
+model WebhookDelivery {
+  id           String    @id @default(cuid())
+  eventType    String // post.created, post.updated, etc.
+  payload      Json // Event payload
+  httpStatus   Int? // Response status code
+  responseBody String? // Response from endpoint
+  success      Boolean   @default(false)
+  attemptCount Int       @default(0)
+  nextRetry    DateTime?
+
+  endpointId String
+  endpoint   WebhookEndpoint @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+
+  createdAt   DateTime  @default(now())
+  deliveredAt DateTime?
+
+  @@map("webhook_deliveries")
+}
+
+model TextBlock {
+  id         String  @id @default(cuid())
+  text       String  @db.Text
+  blockName  String  @default("Text")
+  hasDropCap Boolean @default(false)
+  position   Int // For ordering within post
+
+  postId String
+  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("text_blocks")
+}
+
+model VideoBlock {
+  id        String  @id @default(cuid())
+  blockName String  @default("Video")
+  alt       String
+  caption   String?
+  position  Int // For ordering within post
+
+  // File references
+  videoFileId  String
+  videoFile    File   @relation("VideoFile", fields: [videoFileId], references: [id])
+  posterFileId String
+  posterFile   File   @relation("PosterFile", fields: [posterFileId], references: [id])
+
+  postId String
+  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("video_blocks")
+}
+
+model QuoteBlock {
+  id        String  @id @default(cuid())
+  blockName String  @default("Quote")
+  quote     String  @db.Text
+  author    String?
+  source    String?
+  position  Int // For ordering within post
+
+  postId String
+  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("quote_blocks")
+}
+
+model ImagesBlock {
+  id        String  @id @default(cuid())
+  blockName String  @default("Images")
+  caption   String?
+  position  Int // For ordering within post
+
+  postId String
+  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  images GalleryImage[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("images_blocks")
+}
+
+model GalleryImage {
+  id      String  @id @default(cuid())
+  alt     String
+  caption String?
+  order   Int // For ordering images within gallery
+
+  // File reference
+  fileId String
+  file   File   @relation(fields: [fileId], references: [id])
+
+  galleryId String
+  gallery   ImagesBlock @relation(fields: [galleryId], references: [id], onDelete: Cascade)
+
+  @@map("gallery_images")
+}
+
+model Callout {
+  id        String      @id @default(cuid())
+  blockName String      @default("Callout")
+  type      CalloutType
+  title     String?
+  content   String      @db.Text // HTML content
+  position  Int // For ordering within post
+
+  postId String
+  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("callouts")
+}
+
+enum CalloutType {
+  WARNING
+  INFO
+  SUCCESS
+  ERROR
+  TIP
+  DANGER
+  NOTE
+  IMPORTANT
+  CAUTION
+}
+
+model CodeBlock {
+  id              String  @id @default(cuid())
+  blockName       String  @default("Code")
+  codeText        String  @db.Text
+  language        String  @default("javascript")
+  showLineNumbers Boolean @default(true)
+  title           String?
+  maxHeight       Int     @default(400)
+  startLine       Int     @default(1)
+  highlightLines  Int[] // Array of line numbers to highlight
+  position        Int // For ordering within post
+
+  postId String
+  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("code_blocks")
+}
+
+model TableBlock {
+  id           String            @id @default(cuid())
+  blockName    String            @default("Table")
+  caption      String?
+  description  String?
+  mobileLayout TableMobileLayout @default(CARDS)
+  position     Int
+
+  // SIMPLIFIED: Direct file reference only
+  fileId String
+  file   File   @relation(fields: [fileId], references: [id], onDelete: Cascade)
+
+  postId String
+  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("table_blocks")
+}
+
+model TwitterBlock {
+  id        String  @id @default(cuid())
+  blockName String  @default("Twitter")
+  username  String
+  handle    String
+  content   String  @db.Text
+  date      String
+  likes     Int     @default(0)
+  retweets  Int     @default(0)
+  replies   Int     @default(0)
+  verified  Boolean @default(false)
+  position  Int
+
+  imageFileId String?
+  imageFile   File?   @relation("TwitterImageFile", fields: [imageFileId], references: [id])
+
+  avatarId String?
+  avatar   File?   @relation("TwitterAvatar", fields: [avatarId], references: [id])
+
+  postId String
+  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("twitter_blocks")
+}
+
+model InstagramFile {
+  id String @id @default(cuid())
+
+  // File reference
+  fileId String
+  file   File   @relation(fields: [fileId], references: [id])
+
+  blockId String
+  block   InstagramBlock @relation(fields: [blockId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("instagram_files")
+}
+
+model InstagramBlock {
+  id          String          @id @default(cuid())
+  blockName   String          @default("Instagram")
+  username    String
+  avatar      String?
+  location    String?
+  date        String
+  instagramId String
+  caption     String?         @db.Text
+  likes       Int
+  comments    Int
+  verified    Boolean         @default(false)
+  position    Int
+  files       InstagramFile[]
+
+  postId String
+  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("instagram_blocks")
+}
+
+model ProgressTracker {
+  id             String          @id @default(cuid())
+  variant        ProgressVariant @default(SUBTLE)
+  showPercentage Boolean         @default(false)
+
+  postId String @unique
+  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("progress_trackers")
+}
+
+model ChartBlock {
+  id          String    @id @default(cuid())
+  blockName   String    @default("Chart")
+  type        ChartType
+  title       String?
+  description String?
+
+  showGrid   Boolean @default(true)
+  showLegend Boolean @default(true)
+  showFooter Boolean @default(true)
+
+  stacked       Boolean?
+  connectNulls  Boolean?
+  fillOpacity   Float?
+  strokeWidth   Int?
+  barRadius     Int?
+  innerRadius   Int?
+  outerRadius   Int?
+  showLabels    Boolean?
+  labelKey      String?
+  valueKey      String?
+  orientation   Orientation?
+  labelPosition LabelPosition?
+  showDots      Boolean?
+  dotSize       Int?
+  startAngle    Int?
+
+  fileId String
+  file   File   @relation(fields: [fileId], references: [id], onDelete: Cascade)
+
+  xAxis  String
+  yAxis  String
+  series String[]
+
+  position Int
+
+  postId String
+  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("chart_blocks")
+}
+
+model ListBlock {
+  id String @id @default(cuid())
+
+  position  Int // For ordering within post
+  title     String?
+  content   String?
+  checked   Boolean    @default(false)
+  type      ListType
+  items     ListItem[]
+  blockName String     @default("List")
+
+  postId String
+  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("list_blocks")
+}
+
+model ListItem {
+  id      String  @id @default(cuid())
+  title   String
+  content String?
+  checked Boolean @default(false)
+
+  position    Int // For ordering within list
+  listBlockId String
+  listBlock   ListBlock @relation(fields: [listBlockId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("list_items")
+}
+
+model HeadingBlock {
+  id        String       @id @default(cuid())
+  heading   String
+  level     HeadingLevel
+  position  Int // For ordering within post
+  blockName String       @default("Heading")
+
+  postId String
+  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("heading_blocks")
+}
+
+model PollingBlock {
+  id          String          @id @default(cuid())
+  blockName   String          @default("Polling")
+  title       String?
+  description String?
+  position    Int // For ordering within post
+  options     PollingOption[]
+
+  postId String
+  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("polling_blocks")
+}
+
+model PollingOption {
+  id    String @id @default(cuid())
+  label String
+  count Int    @default(0)
+
+  pollingBlockId String
+  pollingBlock   PollingBlock @relation(fields: [pollingBlockId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("polling_options")
+}
+
+model Session {
+  id             String   @id
+  expiresAt      DateTime
+  token          String
+  createdAt      DateTime
+  updatedAt      DateTime
+  ipAddress      String?
+  userAgent      String?
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  impersonatedBy String?
+
+  @@unique([token])
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime
+  updatedAt             DateTime
+
+  @@map("account")
+}
+
+model Verification {
+  id         String    @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime?
+  updatedAt  DateTime?
+
+  @@map("verification")
+}
+
+model Apikey {
+  id                  String    @id
+  name                String?
+  start               String?
+  prefix              String?
+  key                 String
+  userId              String
+  user                User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  refillInterval      Int?
+  refillAmount        Int?
+  lastRefillAt        DateTime?
+  enabled             Boolean?
+  rateLimitEnabled    Boolean?
+  rateLimitTimeWindow Int?
+  rateLimitMax        Int?
+  requestCount        Int?
+  remaining           Int?
+  lastRequest         DateTime?
+  expiresAt           DateTime?
+  createdAt           DateTime
+  updatedAt           DateTime
+  permissions         String?
+  metadata            String?
+
+  @@map("apikey")
+}
+
+enum HeadingLevel {
+  H1
+  H2
+  H3
+  H4
+  H5
+  H6
+}
+
+enum AudioStatus {
+  NOT_GENERATED
+  GENERATING
+  GENERATED
+  FAILED
+  NEEDS_REGENERATION
+}
+
+enum ChartType {
+  AREA
+  BAR
+  LINE
+  PIE
+}
+
+enum UserRole {
+  ADMIN
+  EDITOR
+  AUTHOR
+  READER
+}
+
+enum Permission {
+  POSTS_READ
+  POSTS_WRITE
+  POSTS_DELETE
+
+  ANALYTICS_READ
+
+  FILES_UPLOAD
+  FILES_DELETE
+
+  USERS_READ
+  USERS_WRITE
+
+  WEBHOOKS_READ
+  WEBHOOKS_WRITE
+
+  TAGS_WRITE
+  CATEGORIES_WRITE
+
+  ADMIN_ALL
+}
+
+enum ProgressVariant {
+  SUBTLE
+  VIBRANT
+  NONE
+  CIRCULAR
+}
+
+enum TableMobileLayout {
+  STACK
+  CARDS
+  SCROLL
+}
+
+enum ListType {
+  BULLET
+  NUMBERED
+  CHECKLIST
+}
+
+enum LabelPosition {
+  INSIDE
+  OUTSIDE
+  CENTER
+}
+
+enum Orientation {
+  VERTICAL
+  HORIZONTAL
+}
+
+model PostCollaborator {
+  id        String              @id @default(cuid())
+  postId    String
+  userId    String  
+  role      CollaboratorRole    @default(CONTRIBUTOR)
+  invitedBy String
+  invitedAt DateTime           @default(now())
+  joinedAt  DateTime?
+  status    CollaborationStatus @default(PENDING)
+  
+  post    Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user    User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  inviter User @relation("CollaboratorInviter", fields: [invitedBy], references: [id])
+  
+  @@unique([postId, userId])
+  @@map("post_collaborators")
+}
+
+model PostRevision {
+  id           String      @id @default(cuid())
+  postId       String
+  userId       String
+  revisionType RevisionType
+  summary      String      // "Alice added introduction", "Bob updated conclusion"
+  
+  // What changed in this session
+  blocksChanged Int        @default(0)
+  blocksAdded   Int        @default(0)
+  blocksRemoved Int        @default(0)
+  
+  createdAt    DateTime    @default(now())
+  
+  post         Post        @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user         User        @relation(fields: [userId], references: [id])
+  
+  @@map("post_revisions")
+}
+
+enum CollaboratorRole {
+  OWNER       // Original author, can manage collaborators
+  CONTRIBUTOR // Can edit content
+  REVIEWER    // Can comment and suggest changes
+}
+
+enum CollaborationStatus {
+  PENDING
+  ACTIVE
+  DECLINED
+}
+
+enum RevisionType {
+  DRAFT_SAVE    // Regular editing session
+  MAJOR_EDIT    // Significant changes
+  REVIEW_NOTES  // Comments and suggestions added
+}
