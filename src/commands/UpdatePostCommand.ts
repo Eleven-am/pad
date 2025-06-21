@@ -16,7 +16,7 @@ export class UpdatePostCommand extends BaseCommand<PostWithDetails> {
     }
 
     async execute(): Promise<PostWithDetails> {
-        const data = await unwrap(updatePost(this.args.postId, this.args.input, this.args.userId));
+        const data = await unwrap(updatePost(this.args.postId, this.args.input, this.args.userId)) as PostWithDetails;
         this.data = data;
         return data;
     }
@@ -43,7 +43,7 @@ export class UpdatePostCommand extends BaseCommand<PostWithDetails> {
                 featured: this.args.previousState.featured
             },
             this.args.userId
-        ));
+        )) as PostWithDetails;
         this.data = data;
         return data;
     }

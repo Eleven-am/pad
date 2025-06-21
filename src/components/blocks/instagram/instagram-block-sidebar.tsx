@@ -2,7 +2,7 @@
 
 import {ChangeEvent, useCallback, useMemo, useState} from "react";
 import {Input} from "@/components/ui/input";
-import {CreateInstagramBlockInput} from "@/services/types";
+import {CreateInstagramBlockInput, UnifiedBlockOutput} from "@/services/types";
 import {BaseBlockSidebarProps} from "@/components/sidebars/types";
 import {BaseBlockSidebarLayout, BlockSidebarHeader, BlockSidebarFooter} from "@/components/sidebars/base-block-sidebar";
 import {Label} from "@/components/ui/label";
@@ -69,7 +69,7 @@ export function InstagramBlockSidebar({onClose, onSave, onDelete, isUpdate, init
 		
 		setIsLoading(true);
 		try {
-			const result = await unwrap(createInstagramPost(postId, session.user.id, url));
+			const result = await unwrap(createInstagramPost(postId, session.user.id, url)) as UnifiedBlockOutput;
 			if (result.type === BlockType.INSTAGRAM) {
 				setFetchedData(result.data as CreateInstagramBlockInput);
 				await loadPost(postId, true, result);

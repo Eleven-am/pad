@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
 import { Plus, Users, Activity } from 'lucide-react';
 import { InviteCollaboratorModal } from './invite-collaborator-modal';
 import { ActivitySidebar } from './activity-sidebar';
@@ -16,7 +15,7 @@ interface CollaborationHeaderProps {
 }
 
 export function CollaborationHeader({ postId }: CollaborationHeaderProps) {
-  const { collaborators, canInvite, loading } = useCollaboration();
+  const { collaborators, canInvite, loading, userId } = useCollaboration();
   const [showInviteModal, setShowInviteModal] = useState(false);
 
   if (loading) {
@@ -34,7 +33,7 @@ export function CollaborationHeader({ postId }: CollaborationHeaderProps) {
     );
   }
 
-  const getTimeAgo = (date?: Date) => {
+  const getTimeAgo = (date?: Date | null) => {
     if (!date) return '';
     const now = new Date();
     const diff = now.getTime() - date.getTime();
@@ -44,14 +43,6 @@ export function CollaborationHeader({ postId }: CollaborationHeaderProps) {
     return `${Math.floor(hours / 24)}d ago`;
   };
 
-  const getRoleColor = (role: string) => {
-    switch (role) {
-      case 'OWNER': return 'bg-blue-100 text-blue-800';
-      case 'CONTRIBUTOR': return 'bg-green-100 text-green-800';
-      case 'REVIEWER': return 'bg-yellow-100 text-yellow-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
 
   return (
     <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -77,7 +68,7 @@ export function CollaborationHeader({ postId }: CollaborationHeaderProps) {
                   <div className="absolute -top-10 left-1/2 transform -translate-x-1/2 bg-popover text-popover-foreground px-2 py-1 rounded text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity z-50">
                     <div className="font-medium">{collaborator.name || collaborator.email}</div>
                     <div className="text-muted-foreground">
-                      {collaborator.role} {getTimeAgo(collaborator.lastActive)}
+                      {collaborator.role} {getTimeAgo(collaborator.joinedAt)}
                     </div>
                   </div>
                 </div>
@@ -132,6 +123,7 @@ export function CollaborationHeader({ postId }: CollaborationHeaderProps) {
 
       <InviteCollaboratorModal 
         postId={postId}
+        userId={userId || ''}
         open={showInviteModal}
         onOpenChange={setShowInviteModal}
       />

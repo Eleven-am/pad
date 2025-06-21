@@ -16,13 +16,13 @@ export class PublishPostCommand extends BaseCommand<PostWithDetails> {
     }
 
     async execute(): Promise<PostWithDetails> {
-        const data = await unwrap(publishPost(this.args.postId, this.args.userId));
+        const data = await unwrap(publishPost(this.args.postId, this.args.userId)) as PostWithDetails;
         this.data = data;
         return data;
     }
 
     async undo(): Promise<PostWithDetails> {
-        const data = await unwrap(unpublishPost(this.args.postId, this.args.userId));
+        const data = await unwrap(unpublishPost(this.args.postId, this.args.userId)) as PostWithDetails;
         this.data = data;
         return data;
     }

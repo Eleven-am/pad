@@ -134,7 +134,7 @@ class CommandManager extends Notifier<CommandState> {
 		
 		await this.executeCommand (
 			() => new UpdateCommand (this.state.post!.id, {blockId, previousState: block, newState}),
-			(result) => this.handleBlockResult (result, 'update')
+			(result) => this.handleBlockResult (result as UnifiedBlockOutput, 'update')
 		);
 	}
 	
@@ -215,12 +215,12 @@ class CommandManager extends Notifier<CommandState> {
 		);
 	}
 	
-	async createTag (data: TagData): Promise<void> {
-		await this.executeCommand (
+	async createTag (data: TagData): Promise<Tag | null> {
+		return await this.executeCommand (
 			() => new CreateTagCommand (data),
 			(result) => this.handleTagResult (result, 'create'),
 			false
-		);
+		) as Tag | null;
 	}
 	
 	async updateTag (tagId: string, data: TagData): Promise<void> {
@@ -294,7 +294,7 @@ class CommandManager extends Notifier<CommandState> {
 			blocks
 		})
 		
-		const post = await unwrap (getPostById (postId, includeUnpublished));
+		const post = await unwrap (getPostById (postId, includeUnpublished)) as PostWithDetails;
 		await this.managePostDetail (post);
 	}
 	
@@ -326,12 +326,17 @@ class CommandManager extends Notifier<CommandState> {
 	}
 	
 	private async managePostDetail (post: PostWithDetails): Promise<void> {
-		const [blocks, analysis, categories, tags] = await Promise.all ([
+		const [blocksResult, analysisResult, categoriesResult, tagsResult] = await Promise.all ([
 			unwrap (getBlocksByPostId (post.id)),
 			unwrap (getContentAnalysis (post.id)),
 			unwrap (getCategories ()),
 			unwrap (getTags ())
 		]);
+		
+		const blocks = blocksResult as UnifiedBlockOutput[];
+		const analysis = analysisResult as ContentAnalysis;
+		const categories = categoriesResult as Category[];
+		const tags = tagsResult as Tag[];
 		
 		this.updateState ({
 			post,
@@ -442,7 +447,11 @@ class CommandManager extends Notifier<CommandState> {
 			const command = getCommand ();
 			updateIndex ();
 			const result = operation === 'undo' ? await command.undo () : await command.redo ();
-			this.updateBlocks (result);
+			
+			// Only update blocks if the result is a UnifiedBlockOutput
+			if (result && typeof result === 'object' && 'type' in result && 'data' in result) {
+				this.updateBlocks (result as UnifiedBlockOutput);
+			}
 		} catch (e) {
 			this.updateState ({error: String (e)});
 		}

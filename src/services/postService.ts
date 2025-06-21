@@ -162,7 +162,7 @@ export class PostService extends BaseService {
 	 * @param includeUnpublished - Whether to include unpublished posts
 	 * @returns The post with details
 	 */
-	getPostBySlug(slug: string, includeUnpublished = false): TaskEither<PostWithDetails> {
+	getPostBySlug(slug: string, includeUnpublished = false) {
 		return TaskEither
 			.tryCatch(
 				() => this.prisma.post.findUnique({

@@ -1,7 +1,7 @@
-import {CreateBlockInput, UnifiedBlockInput, BlockType, UnifiedBlockOutput, CategoryData, TagData} from "@/services/types";
+import {CreateBlockInput, BlockType, UnifiedBlockOutput, CategoryData, TagData} from "@/services/types";
 import { CreatePostInput, PostWithDetails, UpdatePostInput } from "@/services/postService";
 
-export interface BaseCommand<T = any> {
+export interface BaseCommand<T = unknown> {
 	postId: string;
     timestamp: number;
     execute(): Promise<T>;
@@ -56,7 +56,7 @@ export interface PublishPostCommandData {
     previousState: PostWithDetails;
 }
 
-export interface CreateCategoryCommandData extends CategoryData {}
+export type CreateCategoryCommandData = CategoryData;
 
 export interface UpdateCategoryCommandData extends CategoryData {
     id: string;
@@ -66,7 +66,7 @@ export interface DeleteCategoryCommandData {
     id: string;
 }
 
-export interface CreateTagCommandData extends TagData {}
+export type CreateTagCommandData = TagData;
 
 export interface UpdateTagCommandData extends TagData {
     id: string;

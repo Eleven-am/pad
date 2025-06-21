@@ -6,25 +6,41 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
-import { ReactNode, use, useState } from "react"
+import { ReactNode, use, useState, useEffect } from "react"
 import { SiteConfig } from "@/lib/config"
 import { useTheme } from "next-themes";
 import { useMounted } from "@/hooks/useMounted";
+import { AuthSession } from "@/types/auth";
 
 interface FooterProps {
 	config: SiteConfig
 }
 
-interface WebsiteWrapperProps {
-	children: ReactNode
-	promise: Promise<SiteConfig>
+interface HeaderProps {
+	config: SiteConfig;
+	session: AuthSession | null;
 }
 
-function Header({ config }: FooterProps) {
+interface WebsiteWrapperProps {
+	children: ReactNode
+	configPromise: Promise<SiteConfig>
+	sessionPromise: Promise<AuthSession | null>
+}
+
+function Header({ config, session }: HeaderProps) {
 	const mounted = useMounted();
 	const {theme, setTheme} = useTheme();
-	const [loggedIn] = useState(true);
+	const loggedIn = !!session?.user;
 	const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+	const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+	
+	// For now, we'll use the image from OAuth providers
+	// TODO: Implement fetching extended user data with avatarFileId
+	useEffect(() => {
+		if (session?.user?.image) {
+			setAvatarUrl(session.user.image);
+		}
+	}, [session]);
 	
 	return (
 		<header className="sticky flex items-center justify-center top-0 z-50 w-full border-b border-border/40 bg-background/80 backdrop-blur-sm">
@@ -72,12 +88,17 @@ function Header({ config }: FooterProps) {
 					)}
 					
 					{loggedIn && (
-						<div className="hidden md:block">
-							<Avatar className="h-8 w-8 cursor-pointer">
-								<AvatarImage src="/placeholder.svg?height=32&width=32" alt="User Avatar"/>
-								<AvatarFallback>{config.name.charAt (0).toUpperCase ()}</AvatarFallback>
+						<Link href="/profile" className="hidden md:block">
+							<Avatar className="h-8 w-8 cursor-pointer transition-all hover:ring-2 hover:ring-primary hover:ring-offset-2">
+								<AvatarImage 
+									src={avatarUrl || session?.user?.image || undefined} 
+									alt={session?.user?.name || "User Avatar"}
+								/>
+								<AvatarFallback>
+									{session?.user?.name?.charAt(0)?.toUpperCase() || session?.user?.email?.charAt(0)?.toUpperCase() || 'U'}
+								</AvatarFallback>
 							</Avatar>
-						</div>
+						</Link>
 					)}
 					
 					<div className="md:hidden">
@@ -133,14 +154,22 @@ function Header({ config }: FooterProps) {
 									
 									{loggedIn && (
 										<div className="border-t pt-4 mt-auto">
-											<div className="flex items-center gap-2">
+											<Link 
+												href="/profile" 
+												className="flex items-center gap-2 hover:bg-accent rounded-md p-2 -m-2 transition-colors"
+												onClick={() => setIsMobileMenuOpen(false)}
+											>
 												<Avatar className="h-8 w-8">
-													<AvatarImage src="/placeholder.svg?height=32&width=32"
-													             alt="User Avatar"/>
-													<AvatarFallback>{config.name.charAt (0).toUpperCase ()}</AvatarFallback>
+													<AvatarImage 
+														src={avatarUrl || session?.user?.image || undefined}
+														alt={session?.user?.name || "User Avatar"}
+													/>
+													<AvatarFallback>
+														{session?.user?.name?.charAt(0)?.toUpperCase() || session?.user?.email?.charAt(0)?.toUpperCase() || 'U'}
+													</AvatarFallback>
 												</Avatar>
-												<span className="text-sm font-medium">User Profile</span>
-											</div>
+												<span className="text-sm font-medium">{session?.user?.name || 'User Profile'}</span>
+											</Link>
 										</div>
 									)}
 								</div>
@@ -176,27 +205,22 @@ function Footer ({ config }: FooterProps) {
 					<div className="text-xs text-muted-foreground text-center md:text-right">
 						© {new Date ().getFullYear ()} {config.name}.<span className="mx-1">Powered by</span>
 						<Link
-							href={config.padPlatform.projectUrl}
+							href={'https://github.com/eleven-am/pad'}
 							target="_blank"
 							rel="noopener noreferrer"
 							className="hover:text-foreground underline"
 						>
-							{config.padPlatform.name}
+							Pad
 						</Link>
-						{config.padPlatform.githubUrl && (
-							<>
-								{" ("}
-								<Link
-									href={config.padPlatform.githubUrl}
-									target="_blank"
-									rel="noopener noreferrer"
-									className="hover:text-foreground underline"
-								>
-									Source
-								</Link>
-								{")"}
-							</>
-						)}
+						{", "}
+						<Link
+							href={'https://github.com/eleven-am'}
+							target="_blank"
+							rel="noopener noreferrer"
+							className="hover:text-foreground underline"
+						>
+							Roy OSSAI
+						</Link>
 						.
 					</div>
 				</div>
@@ -205,12 +229,13 @@ function Footer ({ config }: FooterProps) {
 	)
 }
 
-export function WebsiteWrapper({children, promise}: WebsiteWrapperProps) {
-	const config = use(promise);
+export function WebsiteWrapper({children, configPromise, sessionPromise}: WebsiteWrapperProps) {
+	const config = use(configPromise);
+	const session = use(sessionPromise);
 
 	return (
 		<div className="flex flex-col min-h-screen">
-			<Header config={config}/>
+			<Header config={config} session={session}/>
 			<main className="flex-1 relative">
 				{children}
 			</main>

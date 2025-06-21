@@ -2,7 +2,7 @@
 
 import { cache } from 'react'
 import {contentService, instagramService, mediaService, postService, tableService, postCollaborationService} from "@/services/di";
-import { siteConfig} from "@/lib/faker-data";
+import { siteConfigService } from "@/services/di";
 import {
 	BlockType,
 	CreateBlockInput,
@@ -30,11 +30,12 @@ import {
 	canUpdateTagCached,
 	canDeleteTagCached,
 } from './permissions';
-import { PadResult } from './guard';
+import {padCache, PadResult} from './guard';
 import { ProgressVariant, CollaboratorRole, RevisionType } from "@/generated/prisma";
 
 export async function unwrap<T>(result: Promise<PadResult<T>>): Promise<T> {
 	const res = await result;
+	console.log('Unwrapping result:', res);
 
 	if ('success' in res && res.success) {
 		return res.data;
@@ -45,7 +46,7 @@ export async function unwrap<T>(result: Promise<PadResult<T>>): Promise<T> {
 }
 
 
-export const getPublicUrl = canReadFileCached(async (fileId: string) => {
+export const getPublicUrl = padCache(async (fileId: string) => {
 	return mediaService.getPublicUrl(fileId, 60).toResult();
 });
 
@@ -97,11 +98,11 @@ export const getBlocksBySlug = canReadPostCached(async (slug: string) => {
 	return contentService.getBlocksBySlug(slug).toResult();
 });
 
-export const getPostById = canReadPostCached(async (postId: string, includeUnpublished = false) => {
+export const getPostById = canReadPostCached(async (postId: string, includeUnpublished: boolean = false) => {
 	return postService.getPostById(postId, includeUnpublished).toResult();
 });
 
-export const getPostBySlug = canReadPostCached(async (slug: string, includeUnpublished = false) => {
+export const getPostBySlug = canReadPostCached(async (slug: string, includeUnpublished: boolean = false) => {
 	return postService.getPostBySlug(slug, includeUnpublished).toResult();
 });
 
@@ -134,7 +135,8 @@ export const deleteBlocksInPost = canDeletePostCached(async (blocks: UnifiedBloc
 });
 
 export const getSiteConfig = cache(async () => {
-	return Promise.resolve(siteConfig);
+	const config = await siteConfigService.getSiteConfig().toPromise();
+	return siteConfigService.convertToLegacyFormat(config);
 });
 
 export const publishPost = canPublishPostCached(async (postId: string, userId: string) => {
@@ -227,7 +229,7 @@ export const updateCollaboratorRole = canUpdatePostCached(async (postId: string,
 	return postCollaborationService.updateCollaboratorRole(postId, collaboratorUserId, newRole, updaterUserId).toResult();
 });
 
-export const createRevision = canUpdatePostCached(async (postId: string, userId: string, revisionType: RevisionType, summary: string, blocksAdded = 0, blocksModified = 0, blocksRemoved = 0) => {
+export const createRevision = canUpdatePostCached(async (postId: string, userId: string, revisionType: RevisionType, summary: string, blocksAdded: number = 0, blocksModified: number = 0, blocksRemoved: number = 0) => {
 	return postCollaborationService.createRevision({
 		postId,
 		userId,
@@ -243,11 +245,11 @@ export const getPostCollaborators = canReadPostCached(async (postId: string) => 
 	return postCollaborationService.getPostCollaborators(postId).toResult();
 });
 
-export const getPostActivity = canReadPostCached(async (postId: string, limit = 20) => {
+export const getPostActivity = canReadPostCached(async (postId: string, limit: number = 20) => {
 	return postCollaborationService.getPostActivity(postId, limit).toResult();
 });
 
-export const getPendingInvitations = cache(async (userId: string) => {
+export const getPendingInvitations = padCache(async (userId: string) => {
 	return postCollaborationService.getPendingInvitations(userId).toResult();
 });
 
@@ -262,3 +264,43 @@ export const getCollaborationSummary = canReadPostCached(async (postId: string) 
 export const getUserCollaborativePosts = cache(async (userId: string) => {
 	return postCollaborationService.getUserCollaborativePosts(userId).toResult();
 });
+
+// Unauthenticated versions for public blog viewing
+export const getPostBySlugPublic = padCache(async (slug: string, includeUnpublished: boolean = false) => {
+	return postService.getPostBySlug(slug, includeUnpublished).toResult();
+});
+
+export const getBlocksByPostIdPublic = padCache(async (postId: string) => {
+	return contentService.getBlocksByPostId(postId).toResult();
+});
+
+export const getTrackerByPostIdPublic = padCache(async (postId: string) => {
+	return postService.getProgressTracker(postId).toResult();
+});
+
+export const getContentAnalysisPublic = padCache(async (postId: string) => {
+	return contentService.analyzeContent(postId).toResult();
+});
+
+// Co-author management functions
+export const promoteToCoAuthor = canUpdatePostCached(async (postId: string, collaboratorUserId: string, updaterUserId: string) => {
+	return postCollaborationService.promoteToCoAuthor(postId, collaboratorUserId, updaterUserId).toResult();
+});
+
+export const demoteFromCoAuthor = canUpdatePostCached(async (postId: string, coAuthorUserId: string, updaterUserId: string) => {
+	return postCollaborationService.demoteFromCoAuthor(postId, coAuthorUserId, updaterUserId).toResult();
+});
+
+export const getPostAuthors = canReadPostCached(async (postId: string) => {
+	return postCollaborationService.getPostAuthors(postId).toResult();
+});
+
+export const isUserAuthor = canReadPostCached(async (postId: string, userId: string) => {
+	return postCollaborationService.isUserAuthor(postId, userId).toResult();
+});
+
+// Public versions for blog display
+export const getPostAuthorsPublic = padCache(async (postId: string) => {
+	return postCollaborationService.getPostAuthors(postId).toResult();
+});
+

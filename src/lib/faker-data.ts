@@ -13,8 +13,10 @@ export const siteConfig = {
 	},
 	navLinks: [
 		{ label: "Home", href: "/" },
+		{ label: "Dashboard", href: "/dashboard" },
 		{ label: "Archives", href: "/archives" },
 		{ label: "Categories", href: "/categories" },
-		{ label: "About", href: "/about" },
+		{ label: "Profile", href: "/profile" },
+		{ label: "Settings", href: "/settings" },
 	],
 }

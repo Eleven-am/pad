@@ -41,6 +41,7 @@ model User {
   // Collaboration relationships
   collaborations PostCollaborator[]
   invitedCollaborations PostCollaborator[] @relation("CollaboratorInviter")
+  emailInvitations EmailInvitation[] @relation("EmailInviter")
   postRevisions PostRevision[]
 
   emailVerified Boolean
@@ -108,6 +109,7 @@ model Post {
 
   // Collaboration relationships
   collaborators PostCollaborator[]
+  emailInvitations EmailInvitation[]
   revisions     PostRevision[]
 
   // Block relationships
@@ -152,6 +154,10 @@ model File {
 
   // User avatars
   userAvatars User[] @relation("UserAvatar")
+
+  // Site branding files
+  siteLogos    SiteConfig[] @relation("SiteLogo")
+  siteFavicons SiteConfig[] @relation("SiteFavicon")
 
   // Uploader reference
   uploaderId String
@@ -906,6 +912,7 @@ model PostRevision {
 
 enum CollaboratorRole {
   OWNER       // Original author, can manage collaborators
+  CO_AUTHOR   // Co-author, credited as author but cannot manage collaborators
   CONTRIBUTOR // Can edit content
   REVIEWER    // Can comment and suggest changes
 }
@@ -916,8 +923,82 @@ enum CollaborationStatus {
   DECLINED
 }
 
+model EmailInvitation {
+  id        String              @id @default(cuid())
+  email     String              
+  postId    String
+  role      CollaboratorRole    @default(CONTRIBUTOR)
+  invitedBy String
+  invitedAt DateTime           @default(now())
+  expiresAt DateTime           // Invitation expiry
+  token     String             @unique // Unique token for accepting/declining
+  status    InvitationStatus   @default(PENDING)
+  
+  post    Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  inviter User @relation("EmailInviter", fields: [invitedBy], references: [id])
+  
+  @@unique([email, postId])
+  @@map("email_invitations")
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  EXPIRED
+}
+
 enum RevisionType {
   DRAFT_SAVE    // Regular editing session
   MAJOR_EDIT    // Significant changes
   REVIEW_NOTES  // Comments and suggestions added
+}
+
+// Site Configuration Model
+model SiteConfig {
+  id        String   @id @default(cuid())
+  
+  // Basic Site Info
+  siteName        String   @default("Pad Blog")
+  siteDescription String?  @db.Text
+  siteTagline     String?
+  
+  // Logo and Branding
+  logoFileId      String?
+  logoFile        File?    @relation("SiteLogo", fields: [logoFileId], references: [id])
+  faviconFileId   String?
+  faviconFile     File?    @relation("SiteFavicon", fields: [faviconFileId], references: [id])
+  
+  // Social Media
+  twitterUrl      String?
+  githubUrl       String?
+  linkedinUrl     String?
+  facebookUrl     String?
+  instagramUrl    String?
+  
+  // SEO Settings
+  seoKeywords     String?  @db.Text
+  googleAnalytics String?
+  gtmId           String?
+  
+  // Footer Links (JSON array)
+  footerLinks     Json?    @default("[]")
+  
+  // Navigation Links (JSON array) - Home is always included automatically
+  navLinks        Json?    @default("[]")
+  
+  // Email Settings
+  contactEmail    String?
+  adminEmail      String?
+  
+  // Features
+  allowComments      Boolean @default(true)
+  allowRegistration  Boolean @default(true)
+  enableAnalytics    Boolean @default(false)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Only one site config should exist (singleton pattern)
+  @@map("site_config")
 }

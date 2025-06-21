@@ -16,7 +16,7 @@ export class CreateCategoryCommand extends BaseCommand<Category> {
 	}
 	
 	async execute (): Promise<Category> {
-		const category = await unwrap (createCategory (this.data));
+		const category = await unwrap (createCategory (this.data)) as Category;
 		this.createdCategory = category;
 		return category;
 	}
@@ -40,8 +40,8 @@ export class UpdateCategoryCommand extends BaseCommand<Category> {
 	}
 	
 	async execute (): Promise<Category> {
-		this.previousCategory = await unwrap(getCategoryById(this.data.id));
-		return await unwrap (updateCategory (this.data.id, this.data));
+		this.previousCategory = await unwrap(getCategoryById(this.data.id)) as Category;
+		return await unwrap (updateCategory (this.data.id, this.data)) as Category;
 	}
 	
 	async undo (): Promise<Category> {
@@ -50,7 +50,7 @@ export class UpdateCategoryCommand extends BaseCommand<Category> {
 		}
 		// Convert nulls to undefined for CategoryData
 		const prev = { ...this.previousCategory, description: this.previousCategory.description ?? undefined, color: this.previousCategory.color ?? undefined, parentId: this.previousCategory.parentId ?? undefined };
-		return await unwrap (updateCategory (this.data.id, prev));
+		return await unwrap (updateCategory (this.data.id, prev)) as Category;
 	}
 }
 
@@ -64,7 +64,7 @@ export class DeleteCategoryCommand extends BaseCommand<Category> {
 	}
 	
 	async execute (): Promise<Category> {
-		this.deletedCategory = await unwrap(getCategoryById(this.data.id));
+		this.deletedCategory = await unwrap(getCategoryById(this.data.id)) as Category;
 		await unwrap(deleteCategory(this.data.id));
 		return this.deletedCategory;
 	}
@@ -74,6 +74,6 @@ export class DeleteCategoryCommand extends BaseCommand<Category> {
 			throw new Error ('Cannot undo category deletion: category was not deleted');
 		}
 		const cat = { ...this.deletedCategory, description: this.deletedCategory.description ?? undefined, color: this.deletedCategory.color ?? undefined, parentId: this.deletedCategory.parentId ?? undefined };
-		return await unwrap (createCategory (cat));
+		return await unwrap (createCategory (cat)) as Category;
 	}
 } 

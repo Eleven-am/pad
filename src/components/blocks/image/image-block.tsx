@@ -1,6 +1,5 @@
 "use client";
 
-import Image from 'next/image';
 import { ImagesBlock as PrismaImagesBlock, GalleryImage } from '@/generated/prisma';
 import { getPublicUrl } from "@/lib/data";
 import { sortBy } from "@eleven-am/fp";
@@ -244,8 +243,10 @@ function Block({ block, filePromises }: MediaGalleryProps & { filePromises: Prom
 
 export function ImagesBlock({ block }: MediaGalleryProps) {
 	const mappedPromises = useMemo(() => {
-		return block.images.map(async (image) => {
-			const publicUrl = await unwrap(getPublicUrl(image.fileId));
+		return block.images.map(async (image: GalleryImage) => {
+			// Use pre-fetched URL if available
+			const imageWithUrl = image as GalleryImage & { publicUrl?: string };
+			const publicUrl = imageWithUrl.publicUrl || await unwrap(getPublicUrl(image.fileId)) as string;
 			return {
 				publicUrl,
 				id: image.id,

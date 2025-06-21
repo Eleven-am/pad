@@ -9,7 +9,7 @@ export function useFileId(fileId: string) {
 	
 	const getFileUrl = useCallback(async () => {
 		const url = await unwrap(getPublicUrl(fileId));
-		setUrl(url);
+		setUrl(url as string);
 	}, [fileId]);
 	
 	useEffect(() => void getFileUrl(), [getFileUrl]);

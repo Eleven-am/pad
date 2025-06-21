@@ -1,6 +1,6 @@
 "use client";
 
-import {useCallback} from "react";
+import React, {useCallback} from "react";
 import {
 	closestCenter,
 	DndContext,
@@ -11,30 +11,25 @@ import {
 	useSensors,
 } from "@dnd-kit/core";
 import {arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy} from "@dnd-kit/sortable";
-import {Button} from "@/components/ui/button";
-import {Redo, Undo} from "lucide-react";
 import {useBlockPostActions, useBlockPostState} from "@/commands/CommandManager";
-import {useBlockContext} from "@/components/sidebars/context/block-context";
+import { useMenu } from "@/components/menu";
 import {UnifiedBlockOutput} from "@/services/types";
-import {Views} from "@/components/sidebars/types";
 import {SortableItem} from "@/components/blocks/queue/sortable-item";
 
-export function QueueSidebar () {
-	const {undo, redo, moveBlocks} = useBlockPostActions ();
-	const {setBlockData, setView, setBlockType, setBlockName, setBlockId} = useBlockContext ();
-	const {canUndo, canRedo, blocks} = useBlockPostState ((state) => ({
-		canUndo: state.canUndo,
-		canRedo: state.canRedo,
+export const QueueSidebar = React.memo(() => {
+	const {moveBlocks} = useBlockPostActions ();
+	const {setBlockData, setBlocksSubPanel, setBlockType, setBlockName, setBlockId} = useMenu();
+	const {blocks} = useBlockPostState ((state) => ({
 		blocks: state.blocks,
 	}));
 	
 	const handleBlockClick = useCallback ((block: UnifiedBlockOutput) => () => {
 		setBlockData (block);
 		setBlockType (block.type);
-		setView (Views.BlockSidebar);
+		setBlocksSubPanel('edit');
 		setBlockId (block.data.id);
 		setBlockName (block.data.blockName);
-	}, [setBlockData, setBlockId, setBlockName, setBlockType, setView]);
+	}, [setBlockData, setBlockId, setBlockName, setBlockType, setBlocksSubPanel]);
 	
 	const sensors = useSensors (
 		useSensor (PointerSensor),
@@ -57,19 +52,11 @@ export function QueueSidebar () {
 	}, [blocks, moveBlocks]);
 	
 	return (
-		<div className="w-1/5 h-full border-l border-border">
+		<div className="w-full h-full border-l border-border">
 			<div className="flex flex-col w-full p-4 space-y-4 border-b border-border">
-				<div className="flex items-center justify-between">
-					<h2 className="text-2xl font-bold">Queue</h2>
-					<div className="flex items-center space-x-2">
-						<Button variant="ghost" size="icon" onClick={undo} disabled={ ! canUndo}>
-							<Undo className="h-4 w-4"/>
-						</Button>
-						<Button variant="ghost" size="icon" onClick={redo} disabled={ ! canRedo}>
-							<Redo className="h-4 w-4"/>
-						</Button>
-					</div>
-				</div>
+				<h3 className="text-lg font-semibold">
+					Blocks Stack
+				</h3>
 			</div>
 			<DndContext
 				sensors={sensors}
@@ -91,4 +78,6 @@ export function QueueSidebar () {
 			</DndContext>
 		</div>
 	);
-}
+});
+
+QueueSidebar.displayName = 'QueueSidebar';

@@ -16,7 +16,7 @@ export class CreatePostCommand extends BaseCommand<PostWithDetails> {
     }
 
     async execute(): Promise<PostWithDetails> {
-        const data = await unwrap(createPost(this.args.input, this.args.userId));
+        const data = await unwrap(createPost(this.args.input, this.args.userId)) as PostWithDetails;
         this.data = data;
         return data;
     }

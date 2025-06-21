@@ -80,7 +80,8 @@ export function ChartBlockSidebar({onClose, onSave, onDelete, initialData, isUpd
 			setAnalysisError(null);
 			
 			unwrap(analyzeFileForChart(fileId))
-				.then((analysis) => {
+				.then((analysisResult) => {
+					const analysis = analysisResult as ChartOptions;
 					setChartOptions(analysis);
 					if (fileId === initialData.fileId) {
 						return;

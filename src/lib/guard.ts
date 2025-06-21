@@ -27,10 +27,10 @@ export type PadResult<T> = SuccessResult<T> | FailedResult;
 export function guard<T extends keyof Statement>(
 	statement: Pick<Statement, T>
 ) {
-	return function <F extends (...args: any[]) => Promise<Result<any>>>(fn: F) {
-		return async (...args: Parameters<F>): Promise<PadResult<
-			F extends (...args: any[]) => Promise<Result<infer O>> ? O : never
-		>> => {
+	return function <TArgs extends readonly unknown[], TResult>(
+		fn: (...args: TArgs) => Promise<Result<TResult>>
+	) {
+		return async (...args: TArgs): Promise<PadResult<TResult>> => {
 			const session = await auth.api.getSession({
 				headers: await headers()
 			});
@@ -77,5 +77,36 @@ export function guard<T extends keyof Statement>(
 export const cachedGuard = <T extends keyof Statement>(
 	statement: Pick<Statement, T>
 ) => {
-	return cache(guard(statement));
+	const guardFn = guard(statement);
+	return <TArgs extends readonly unknown[], TResult>(
+		fn: (...args: TArgs) => Promise<Result<TResult>>
+	) => {
+		return cache(guardFn(fn));
+	};
+}
+
+const mapResultToPadResult = <
+	TArgs extends readonly unknown[],
+	TResult
+>(fn: (...args: TArgs) => Promise<Result<TResult>>) => {
+	return async (...args: TArgs): Promise<PadResult<TResult>> => {
+		const result = await fn(...args);
+		if (hasError(result)) {
+			return {
+				code: result.code,
+				error: result.error.message || 'An error occurred while processing your request',
+			};
+		}
+		return {
+			data: result.data,
+			success: true,
+		};
+	};
+}
+
+export const padCache = <
+	TArgs extends readonly unknown[],
+	TResult
+>(fn: (...args: TArgs) => Promise<Result<TResult>>): ((...args: TArgs) => Promise<PadResult<TResult>>) => {
+	return cache(mapResultToPadResult(fn)) as (...args: TArgs) => Promise<PadResult<TResult>>;
 }

@@ -8,6 +8,11 @@ import { UserService } from "@/services/userService";
 import { ContentService } from "@/services/contentService";
 import { InstagramService } from "@/services/instagramService";
 import { PostCollaborationService } from "@/services/postCollaborationService";
+import { DashboardService } from "@/services/dashboardService";
+import { DashboardEnhancedService } from "@/services/dashboardEnhancedService";
+import { SiteConfigService } from "@/services/siteConfigService";
+import { PostExcerptService } from "@/services/postExcerptService";
+import { createEmailService } from "@/services/emailService";
 
 const redis = new Redis({
 	host: getOrThrow('REDIS_HOST'),
@@ -35,4 +40,14 @@ export const postService = new PostService(prisma, userService, contentService);
 
 export const instagramService = new InstagramService(mediaService, contentService);
 
-export const postCollaborationService = new PostCollaborationService(prisma);
+export const emailService = createEmailService();
+
+export const postCollaborationService = new PostCollaborationService(prisma, emailService);
+
+export const dashboardService = new DashboardService(prisma);
+
+export const dashboardEnhancedService = new DashboardEnhancedService(prisma);
+
+export const siteConfigService = new SiteConfigService(prisma);
+
+export const postExcerptService = new PostExcerptService(prisma);

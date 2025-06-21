@@ -2,7 +2,7 @@ import { Play } from "lucide-react";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
 import { VideoBlock as PrismaVideoBlock } from "@/generated/prisma";
-import { getPublicUrl } from "@/lib/data";
+import { getPublicUrl, unwrap } from "@/lib/data";
 
 interface VideoBlockProps {
 	block: PrismaVideoBlock;
@@ -15,18 +15,14 @@ export async function VideoBlock({ block }: VideoBlockProps) {
 		return null;
 	}
 
-	const posterUrl = await getPublicUrl(posterFileId);
-	const videoUrl = await getPublicUrl(videoFileId);
-
-	if (!('success' in posterUrl) || !('success' in videoUrl)) {
-		return null;
-	}
+	const posterUrl = await unwrap(getPublicUrl(posterFileId)) as string;
+	const videoUrl = await unwrap(getPublicUrl(videoFileId)) as string;
 	
 	return (
 		<div>
 			<div className={cn("relative w-full aspect-video rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-800 shadow-sm dark:shadow-black/30 shadow-gray-300")}>
 				<Image
-					src={posterUrl.data}
+					src={posterUrl}
 					alt={alt}
 					className="w-full h-full object-cover"
 					loading="lazy"
@@ -47,9 +43,9 @@ export async function VideoBlock({ block }: VideoBlockProps) {
 					className="hidden w-full h-full object-cover"
 					controls
 					preload="none"
-					poster={posterUrl.data}
+					poster={posterUrl}
 				>
-					<source src={videoUrl.data} type="video/mp4" />
+					<source src={videoUrl} type="video/mp4" />
 					Your browser does not support the video tag.
 				</video>
 			</div>

@@ -3,9 +3,8 @@
 import {ChangeEvent, ReactNode, useCallback} from "react";
 import {Button} from "@/components/ui/button";
 import {ArrowLeft} from "lucide-react";
-import {BlockSidebarFooterProps, BlockSidebarHeaderProps, Views} from "@/components/sidebars/types";
-import {AnimatedContent} from "@/components/animated-views";
-import {useBlockContext} from "./context/block-context";
+import {BlockSidebarFooterProps, BlockSidebarHeaderProps} from "@/components/sidebars/types";
+import { useMenu } from "@/components/menu";
 import {getBlockDefinition} from "./registry/block-registry";
 import {Input} from "@/components/ui/input";
 import {CreateBlockInput, UnifiedBlockInputData, UnifiedBlockOutput} from "@/services/types";
@@ -24,9 +23,9 @@ export function BlockSidebarHeader({ title, onClose }: BlockSidebarHeaderProps) 
 				<Button variant="ghost" onClick={onClose} className="p-2">
 					<ArrowLeft />
 				</Button>
-				<h2 className="text-2xl font-bold">
+				<h3 className="text-lg font-semibold">
 					{title}
-				</h2>
+				</h3>
 			</div>
 		</div>
 	);
@@ -58,7 +57,7 @@ export function BlockSidebarFooter({ onSave, onDelete, isUpdate, isValid }: Bloc
 }
 
 export function BaseBlockSidebarLayout({ header, children, footer }: BaseBlockSidebarLayoutProps) {
-	const { blockName, setBlockName } = useBlockContext();
+	const { blockName, setBlockName } = useMenu();
 	
 	const handleChange = useCallback((e: ChangeEvent<HTMLInputElement>) => {
 		setBlockName(e.target.value);
@@ -89,12 +88,13 @@ export function BaseBlockSidebarLayout({ header, children, footer }: BaseBlockSi
 
 export function BlockSidebar() {
 	const { createBlock, updateBlock, deleteBlock } = useBlockPostActions();
-	const { blockType, blockName, blockId, blockData, resetBlock } = useBlockContext();
+	const { blockType, blockName, blockId, blockData, resetBlockState, setActivePanel } = useMenu();
 	const blockDefinition = blockType ? getBlockDefinition(blockType) : null;
 	const blocks = useBlockPostState((state) => state.blocks);
 
 	const handleSave = useCallback(async (data: UnifiedBlockInputData) => {
-		resetBlock(Views.ManagePost);
+		resetBlockState();
+		setActivePanel(null);
 		if (!blockType) {
 			return;
 		}
@@ -118,32 +118,30 @@ export function BlockSidebar() {
 				...data,
 			},
 		} as UnifiedBlockOutput);
-	}, [resetBlock, blockType, blockData, updateBlock, createBlock, blocks.length, blockName]);
+	}, [resetBlockState, setActivePanel, blockType, blockData, updateBlock, createBlock, blocks.length, blockName]);
 
 	const handleDelete = useCallback(() => {
-		resetBlock(Views.ManagePost);
+		resetBlockState();
+		setActivePanel(null);
 		const block = blocks.find((b) => b.data.id === blockId);
 		if (!block) {
 			return;
 		}
 		
 		return deleteBlock(block.data.id);
-	}, [resetBlock, blocks, deleteBlock, blockId]);
+	}, [resetBlockState, setActivePanel, blocks, deleteBlock, blockId]);
 	
 	return (
-		<AnimatedContent
-			className="flex flex-col h-full overflow-hidden border-l border-border"
-			id={Views.BlockSidebar}
-		>
+		<div className="flex flex-col h-full overflow-hidden">
 			{
 				blockDefinition ? <blockDefinition.Component
-					onClose={() => resetBlock(Views.SelectBlock)}
+					onClose={() => setActivePanel(null)}
 					onSave={handleSave}
 					onDelete={handleDelete}
 					initialData={blockData?.data as UnifiedBlockInputData || blockDefinition.defaultData}
 					isUpdate={Boolean(blockData)}
 				/>: null
 			}
-		</AnimatedContent>
+		</div>
 	);
 }

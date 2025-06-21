@@ -25,13 +25,13 @@ export class MoveBlocksCommand extends BaseCommand<UnifiedBlockOutput[]> {
 	}
 	
 	async execute(): Promise<UnifiedBlockOutput[]> {
-		return unwrap(moveBlocks(this.data.updates));
+		return await unwrap(moveBlocks(this.data.updates)) as UnifiedBlockOutput[];
 	}
 	
 	async undo(): Promise<UnifiedBlockOutput[]> {
 		if (this.data.previousPositions.length === 0) {
 			throw new Error("No previous positions to revert to");
 		}
-		return unwrap(moveBlocks(this.data.previousPositions));
+		return await unwrap(moveBlocks(this.data.previousPositions)) as UnifiedBlockOutput[];
 	}
 }

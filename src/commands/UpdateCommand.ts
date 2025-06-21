@@ -18,7 +18,7 @@ export class UpdateCommand extends BaseCommand {
 	
     async execute(): Promise<UnifiedBlockOutput> {
         const input = this.mapToInput(this.args.newState);
-        const result = await unwrap(updateBlock(this.args.blockId, input));
+        const result = await unwrap(updateBlock(this.args.blockId, input)) as UnifiedBlockOutput;
         this.data = result;
         return result;
     }
@@ -29,7 +29,7 @@ export class UpdateCommand extends BaseCommand {
         }
 		
         const input = this.mapToInput(this.args.previousState);
-        const result = await unwrap(updateBlock(this.args.blockId, input));
+        const result = await unwrap(updateBlock(this.args.blockId, input)) as UnifiedBlockOutput;
         this.data = result;
         return result;
     }

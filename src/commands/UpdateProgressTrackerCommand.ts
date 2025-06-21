@@ -23,19 +23,19 @@ export class UpdateProgressTrackerCommand extends BaseCommand<ProgressTracker> {
     }
 
     async execute(): Promise<ProgressTracker> {
-        this.previousTracker = await unwrap(getTrackerByPostId(this.postId));
+        this.previousTracker = await unwrap(getTrackerByPostId(this.postId)) as ProgressTracker | null;
 
         if (!this.previousTracker) {
-            return unwrap(createProgressTracker(this.postId, {
+            return await unwrap(createProgressTracker(this.postId, {
                 variant: this.input.variant,
                 showPercentage: this.input.showPercentage
-            }));
+            })) as ProgressTracker;
         }
 
-        return unwrap(updateProgressTracker(this.postId, {
+        return await unwrap(updateProgressTracker(this.postId, {
             variant: this.input.variant,
             showPercentage: this.input.showPercentage
-        }));
+        })) as ProgressTracker;
     }
 
     async undo(): Promise<ProgressTracker> {
@@ -44,9 +44,9 @@ export class UpdateProgressTrackerCommand extends BaseCommand<ProgressTracker> {
             return this.previousTracker!;
         }
 
-        return unwrap(updateProgressTracker(this.postId, {
+        return await unwrap(updateProgressTracker(this.postId, {
             variant: this.previousTracker.variant,
             showPercentage: this.previousTracker.showPercentage
-        }));
+        })) as ProgressTracker;
     }
 } 

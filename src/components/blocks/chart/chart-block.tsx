@@ -11,7 +11,6 @@ import {ChartSelections, DataRow, prepareChartData} from "@/lib/charts";
 import {unwrap} from "@/lib/unwrap";
 import {$Enums} from "@/generated/prisma";
 import ChartType = $Enums.ChartType;
-import {Card, CardContent} from "@/components/ui/card";
 import {BlockLoading} from "@/components/blocks/loading";
 
 interface ChartBlockProps {
@@ -54,7 +53,7 @@ function Chart({ block, className, promise }: ChartProps) {
 export function ChartBlock({ block, className }: ChartBlockProps) {
     return (
         <Suspense fallback={<BlockLoading className={className} />}>
-            <Chart block={block} className={className} promise={unwrap(getFormatedData(block.fileId))} />
+            <Chart block={block} className={className} promise={unwrap(getFormatedData(block.fileId)) as Promise<DataRow[]>} />
         </Suspense>
     );
 }

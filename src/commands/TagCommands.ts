@@ -27,7 +27,7 @@ export class CreateTagCommand extends BaseCommand<Tag> {
 	}
 	
 	async execute (): Promise<Tag> {
-		const tag = await unwrap (createTag (this.data));
+		const tag = await unwrap (createTag (this.data)) as Tag;
 		this.createdTag = tag;
 		return tag;
 	}
@@ -49,8 +49,8 @@ export class UpdateTagCommand extends BaseCommand<Tag> {
 	}
 	
 	async execute (): Promise<Tag> {
-		this.previousTag = await unwrap (getTagById (this.data.id));
-		return unwrap (updateTag (this.data.id, this.data));
+		this.previousTag = await unwrap (getTagById (this.data.id)) as Tag;
+		return await unwrap (updateTag (this.data.id, this.data)) as Tag;
 	}
 	
 	async undo (): Promise<Tag> {
@@ -60,7 +60,7 @@ export class UpdateTagCommand extends BaseCommand<Tag> {
 			description: this.previousTag.description ?? undefined,
 			color: this.previousTag.color ?? undefined
 		};
-		return unwrap (updateTag (this.data.id, prev));
+		return await unwrap (updateTag (this.data.id, prev)) as Tag;
 	}
 }
 
@@ -74,7 +74,7 @@ export class DeleteTagCommand extends BaseCommand<Tag> {
 	}
 	
 	async execute (): Promise<Tag> {
-		this.deletedTag = await unwrap (getTagById (this.tagId));
+		this.deletedTag = await unwrap (getTagById (this.tagId)) as Tag;
 		await unwrap (deleteTag (this.tagId));
 		return this.deletedTag;
 	}
@@ -86,7 +86,7 @@ export class DeleteTagCommand extends BaseCommand<Tag> {
 			description: this.deletedTag.description ?? undefined,
 			color: this.deletedTag.color ?? undefined
 		};
-		return unwrap (createTag (tagData));
+		return await unwrap (createTag (tagData)) as Tag;
 	}
 }
 
@@ -102,15 +102,15 @@ export class UpdatePostTagsCommand extends BaseCommand<PostWithDetails> {
 	}
 
 	async execute (): Promise<PostWithDetails> {
-		const post = await unwrap (getPostById (this.postId, true));
+		const post = await unwrap (getPostById (this.postId, true)) as PostWithDetails;
 		this.previousTags = post.postTags.map (pt => pt.tagId);
 		await unwrap (updatePostTags (this.postId, this.tagIds, this.userId));
-		return unwrap (getPostById (this.postId, true));
+		return await unwrap (getPostById (this.postId, true)) as PostWithDetails;
 	}
 
 	async undo (): Promise<PostWithDetails> {
 		if (this.previousTags.length === 0) throw new Error ('No previous tags');
 		await unwrap (updatePostTags (this.postId, this.previousTags, this.userId));
-		return unwrap (getPostById (this.postId));
+		return await unwrap (getPostById (this.postId)) as PostWithDetails;
 	}
 }

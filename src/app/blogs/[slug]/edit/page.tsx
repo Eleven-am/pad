@@ -3,6 +3,10 @@ import { getBlocksByPostId, getContentAnalysis, getPostBySlug, getPublicUrl, get
 import {auth} from "@/lib/better-auth/server";
 import {headers} from "next/headers";
 import {redirect} from "next/navigation";
+import { PostWithDetails } from '@/services/postService';
+import { UnifiedBlockOutput, ContentAnalysis } from '@/services/types';
+import { ProgressTracker } from '@/generated/prisma';
+import { preprocessBlocks } from '@/lib/preprocess-blocks';
 
 interface EditBlogPostProps {
     params: Promise<{
@@ -20,11 +24,12 @@ export default async function EditBlogPost({ params }: EditBlogPostProps) {
 		return redirect('/auth');
 	}
 	
-    const post = await unwrap(getPostBySlug(slug, true));
-    const blocks = await unwrap(getBlocksByPostId(post.id));
-    const tracker = await unwrap(getTrackerByPostId(post.id));
-    const analysis = await unwrap(getContentAnalysis(post.id));
-    const avatarUrl =  post.author.avatarFileId ? await unwrap(getPublicUrl(post.author.avatarFileId)) : post.author.image || null;
+    const post = await unwrap(getPostBySlug(slug, true)) as PostWithDetails;
+    const rawBlocks = await unwrap(getBlocksByPostId(post.id)) as UnifiedBlockOutput[];
+    const blocks = await preprocessBlocks(rawBlocks);
+    const tracker = await unwrap(getTrackerByPostId(post.id)) as ProgressTracker | null;
+    const analysis = await unwrap(getContentAnalysis(post.id)) as ContentAnalysis;
+    const avatarUrl =  post.author.avatarFileId ? await unwrap(getPublicUrl(post.author.avatarFileId)) as string : post.author.image || null;
 
     return (
 	    <BlocksSidebar post={post} blocks={blocks} tracker={tracker} avatarUrl={avatarUrl} analysis={analysis} user={session.user} />

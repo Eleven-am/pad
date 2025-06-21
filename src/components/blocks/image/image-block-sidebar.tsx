@@ -1,7 +1,6 @@
 "use client";
 
 import {ChangeEvent, useCallback, useMemo, useState} from "react";
-import {Input} from "@/components/ui/input";
 import {Textarea} from "@/components/ui/textarea";
 import {CreateImagesBlockInput} from "@/services/types";
 import {BaseBlockSidebarProps} from "@/components/sidebars/types";

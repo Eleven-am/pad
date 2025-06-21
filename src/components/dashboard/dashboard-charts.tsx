@@ -6,63 +6,15 @@ import {AreaChartBlock} from "@/components/blocks/chart/area-chart-block";
 import {PieChartBlock} from "@/components/blocks/chart/pie-chart-block";
 import {ChartBlockData} from "@/services/types";
 import {ChartType} from "@/generated/prisma";
+import { TimeSeriesMetric, DashboardMetrics } from '@/services/dashboardService';
 
-// Mock data for charts
-const mockChartData = {
-	lineChart: {
-		data: [
-			{month: "Jan", views: 1200, engagement: 800, shares: 400},
-			{month: "Feb", views: 1800, engagement: 1200, shares: 600},
-			{month: "Mar", views: 2400, engagement: 1600, shares: 800},
-			{month: "Apr", views: 2100, engagement: 1400, shares: 700},
-			{month: "May", views: 2800, engagement: 1900, shares: 950},
-			{month: "Jun", views: 3200, engagement: 2200, shares: 1100},
-		],
-		xAxis: "month",
-		yAxis: "views",
-		series: ["engagement", "shares"]
-	},
-	barChart: {
-		data: [
-			{type: "Text", usage: 35, engagement: 45, retention: 40},
-			{type: "Image", usage: 25, engagement: 35, retention: 30},
-			{type: "Chart", usage: 15, engagement: 25, retention: 20},
-			{type: "Instagram", usage: 10, engagement: 30, retention: 25},
-			{type: "Twitter", usage: 8, engagement: 20, retention: 15},
-			{type: "Code", usage: 5, engagement: 15, retention: 10},
-			{type: "Table", usage: 2, engagement: 10, retention: 8},
-		],
-		xAxis: "type",
-		yAxis: "usage",
-		series: ["engagement", "retention"]
-	},
-	areaChart: {
-		data: [
-			{time: "00:00", visitors: 100, active: 50, returning: 30},
-			{time: "04:00", visitors: 50, active: 20, returning: 15},
-			{time: "08:00", visitors: 300, active: 150, returning: 100},
-			{time: "12:00", visitors: 500, active: 300, returning: 200},
-			{time: "16:00", visitors: 400, active: 250, returning: 180},
-			{time: "20:00", visitors: 200, active: 100, returning: 80},
-			{time: "24:00", visitors: 100, active: 50, returning: 30},
-		],
-		xAxis: "time",
-		yAxis: "visitors",
-		series: ["active", "returning"]
-	},
-	pieChart: {
-		data: [
-			{platform: "Instagram", engagement: 35},
-			{platform: "Twitter", engagement: 30},
-			{platform: "Facebook", engagement: 20},
-			{platform: "LinkedIn", engagement: 15},
-		],
-		labelKey: "platform",
-		valueKey: "engagement"
-	}
-};
 
-export function DashboardCharts () {
+interface DashboardChartsProps {
+	timeSeriesData: TimeSeriesMetric[];
+	blockMetrics: DashboardMetrics['blocks'];
+}
+
+export function DashboardCharts ({ timeSeriesData, blockMetrics }: DashboardChartsProps) {
 	const baseBlock = {
 		id: "",
 		blockName: "",
@@ -102,9 +54,9 @@ export function DashboardCharts () {
 		connectNulls: true,
 		strokeWidth: 2,
 		fileId: "mock",
-		xAxis: mockChartData.lineChart.xAxis,
-		yAxis: mockChartData.lineChart.yAxis,
-		series: mockChartData.lineChart.series,
+		xAxis: "date",
+		yAxis: "views",
+		series: ["reads", "posts"],
 	};
 	
 	const barChartBlock: ChartBlockData = {
@@ -117,41 +69,41 @@ export function DashboardCharts () {
 		showFooter: true,
 		barRadius: 4,
 		fileId: "mock",
-		xAxis: mockChartData.barChart.xAxis,
-		yAxis: mockChartData.barChart.yAxis,
+		xAxis: "type",
+		yAxis: "usage",
 	};
 	
 	const areaChartBlock: ChartBlockData = {
 		...baseBlock,
 		type: ChartType.AREA,
-		title: "Daily Traffic Pattern",
-		description: "Visitor and active user patterns throughout the day",
+		title: "Views and Reads Trend",
+		description: "Daily views and reads over the past week",
 		showGrid: true,
 		showLegend: true,
 		showFooter: true,
 		fillOpacity: 0.3,
 		connectNulls: true,
 		fileId: "mock",
-		xAxis: mockChartData.areaChart.xAxis,
-		yAxis: mockChartData.areaChart.yAxis,
-		series: mockChartData.areaChart.series,
+		xAxis: "date",
+		yAxis: "views",
+		series: ["reads"],
 	};
 	
 	const pieChartBlock: ChartBlockData = {
 		...baseBlock,
 		type: ChartType.PIE,
-		title: "Social Media Engagement",
-		description: "Distribution of engagement across social platforms",
+		title: "Block Type Distribution",
+		description: "Top 5 most used block types in content",
 		showLegend: true,
 		showFooter: true,
 		showLabels: true,
 		innerRadius: 0,
 		outerRadius: 60,
-		labelKey: mockChartData.pieChart.labelKey,
-		valueKey: mockChartData.pieChart.valueKey,
+		labelKey: "type",
+		valueKey: "count",
 		fileId: "mock",
-		xAxis: mockChartData.pieChart.labelKey,
-		yAxis: mockChartData.pieChart.valueKey,
+		xAxis: "type",
+		yAxis: "count",
 	};
 	
 	return (
@@ -160,10 +112,15 @@ export function DashboardCharts () {
 				<LineChartBlock
 					block={lineChartBlock}
 					chartData={{
-						data: mockChartData.lineChart.data,
-						xAxisKey: mockChartData.lineChart.xAxis,
-						yAxisKey: mockChartData.lineChart.yAxis,
-						seriesKeys: mockChartData.lineChart.series,
+						data: timeSeriesData.map(d => ({
+							date: d.date,
+							views: d.views,
+							reads: d.reads,
+							posts: d.posts
+						})),
+						xAxisKey: "date",
+						yAxisKey: "views",
+						seriesKeys: ["reads", "posts"],
 						colors: ["var(--chart-1)", "var(--chart-2)", "var(--chart-3)"]
 					}}
 				/>
@@ -171,10 +128,14 @@ export function DashboardCharts () {
 				<BarChartBlock
 					block={barChartBlock}
 					chartData={{
-						data: mockChartData.barChart.data,
-						xAxisKey: mockChartData.barChart.xAxis,
-						yAxisKey: mockChartData.barChart.yAxis,
-						seriesKeys: mockChartData.barChart.series,
+						data: Object.entries(blockMetrics.distribution).map(([type, count]) => ({
+							type: type.charAt(0).toUpperCase() + type.slice(1),
+							usage: count,
+							percentage: blockMetrics.totalBlocks > 0 ? ((count / blockMetrics.totalBlocks) * 100) : 0
+						})),
+						xAxisKey: "type",
+						yAxisKey: "usage",
+						seriesKeys: ["percentage"],
 						colors: ["var(--chart-1)", "var(--chart-2)", "var(--chart-3)"]
 					}}
 				/>
@@ -182,11 +143,17 @@ export function DashboardCharts () {
 				<PieChartBlock
 					block={pieChartBlock}
 					chartData={{
-						data: mockChartData.pieChart.data,
-						xAxisKey: mockChartData.pieChart.labelKey,
-						yAxisKey: mockChartData.pieChart.valueKey,
-						seriesKeys: ["engagement"],
-						colors: ["var(--chart-1)", "var(--chart-2)", "var(--chart-3)", "var(--chart-4)"]
+						data: Object.entries(blockMetrics.distribution)
+							.filter(([, count]) => count > 0)
+							.slice(0, 5)
+							.map(([type, count]) => ({
+								type: type.charAt(0).toUpperCase() + type.slice(1),
+								count: count
+							})),
+						xAxisKey: "type",
+						yAxisKey: "count",
+						seriesKeys: ["count"],
+						colors: ["var(--chart-1)", "var(--chart-2)", "var(--chart-3)", "var(--chart-4)", "var(--chart-5)"]
 					}}
 				/>
 			</div>
@@ -194,10 +161,14 @@ export function DashboardCharts () {
 			<AreaChartBlock
 				block={areaChartBlock}
 				chartData={{
-					data: mockChartData.areaChart.data,
-					xAxisKey: mockChartData.areaChart.xAxis,
-					yAxisKey: mockChartData.areaChart.yAxis,
-					seriesKeys: mockChartData.areaChart.series,
+					data: timeSeriesData.map(d => ({
+						date: d.date,
+						views: d.views,
+						reads: d.reads
+					})),
+					xAxisKey: "date",
+					yAxisKey: "views",
+					seriesKeys: ["reads"],
 					colors: ["var(--chart-1)", "var(--chart-2)", "var(--chart-3)"]
 				}}
 			/>

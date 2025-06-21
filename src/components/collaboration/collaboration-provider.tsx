@@ -1,9 +1,10 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { getPostCollaborators, canUserEditPost } from '@/lib/data';
 import { unwrap } from '@/lib/data';
 import { CollaboratorRole } from '@/generated/prisma';
+import { CollaboratorWithUser } from '@/services/postCollaborationService';
 
 interface Collaborator {
   id: string;
@@ -20,6 +21,7 @@ interface CollaborationContextValue {
   canInvite: boolean;
   loading: boolean;
   refresh: () => void;
+  userId?: string;
 }
 
 const CollaborationContext = createContext<CollaborationContextValue | null>(null);
@@ -35,19 +37,19 @@ export function CollaborationProvider({ postId, userId, children }: Collaboratio
   const [canEdit, setCanEdit] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       const [collaboratorsResult, canEditResult] = await Promise.all([
         unwrap(getPostCollaborators(postId)),
         userId ? unwrap(canUserEditPost(postId, userId)) : Promise.resolve(false)
-      ]);
+      ]) as [CollaboratorWithUser[], boolean];
 
       setCollaborators(collaboratorsResult.map(c => ({
         id: c.id,
         name: c.user.name,
         email: c.user.email,
         role: c.role,
-        avatarUrl: c.user.avatarUrl,
+        avatarUrl: c.user.avatarFile?.path || null,
         joinedAt: c.joinedAt
       })));
       
@@ -57,13 +59,13 @@ export function CollaborationProvider({ postId, userId, children }: Collaboratio
     } finally {
       setLoading(false);
     }
-  };
+  }, [postId, userId]);
 
   useEffect(() => {
     fetchData();
-  }, [postId, userId]);
+  }, [fetchData]);
 
-  const canInvite = canEdit && userId && collaborators.some(c => 
+  const canInvite = canEdit && !!userId && collaborators.some(c => 
     c.email === userId && (c.role === 'OWNER' || c.role === 'CONTRIBUTOR')
   );
 
@@ -72,7 +74,8 @@ export function CollaborationProvider({ postId, userId, children }: Collaboratio
     canEdit,
     canInvite,
     loading,
-    refresh: fetchData
+    refresh: fetchData,
+    userId
   };
 
   return (

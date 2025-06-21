@@ -5,9 +5,17 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Bookmark, Heart, MessageCircle, Share } from "lucide-react"
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel";
 import { cn } from "@/lib/utils";
-import Image from "next/image";
 import { unwrap } from "@/lib/unwrap";
 import { InstagramBlockData } from "@/services/types";
+
+interface InstagramFile {
+  id: string;
+  createdAt: Date;
+  updatedAt: Date;
+  fileId: string;
+  blockId: string;
+  publicUrl?: string;
+}
 import { getPublicUrl } from "@/lib/data";
 import { Suspense, use } from "react";
 import { BlockLoading } from "@/components/blocks/loading";
@@ -122,15 +130,20 @@ function Block({ block, filePromises, avatarPromise }: InstagramBlockProps) {
 	)
 }
 
-export function InstagramBlock({ block }: { block: InstagramBlockData }) {
-	const { files, avatar } = block;
-	const promises = files.map(async (file) => ({
-		id: block.id,
-		url: await unwrap(getPublicUrl(file.fileId))
-	}));
+export function InstagramBlock({ block }: { block: InstagramBlockData & { files: Array<{ publicUrl?: string }>, avatarUrl?: string | null } }) {
+	const { files, avatar, avatarUrl } = block;
 	
-	const filePromises = Promise.all(promises);
-	const avatarPromise = avatar ? unwrap(getPublicUrl(avatar)) : Promise.resolve(null);
+	// Use pre-fetched URLs if available, otherwise fall back to async fetching
+	const filePromises = Promise.all(
+		files.map(async (file: InstagramFile) => ({
+			id: block.id,
+			url: file.publicUrl || await unwrap(getPublicUrl(file.fileId)) as string
+		}))
+	);
+	
+	const avatarPromise = avatarUrl !== undefined 
+		? Promise.resolve(avatarUrl) 
+		: (avatar ? unwrap(getPublicUrl(avatar)) as Promise<string> : Promise.resolve(null));
 	
 	return (
 		<Suspense fallback={<BlockLoading/>}>

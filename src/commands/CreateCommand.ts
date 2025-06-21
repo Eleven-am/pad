@@ -1,7 +1,6 @@
 "use client";
 
 import { BaseCommand } from "./BaseCommand";
-import { CreateCommandData } from "./types";
 import { UnifiedBlockOutput, CreateBlockInput } from "@/services/types";
 import { createBlock, deleteBlock } from "@/lib/data";
 import { unwrap } from "@/lib/unwrap";
@@ -18,7 +17,7 @@ export class CreateCommand extends BaseCommand<UnifiedBlockOutput> {
     }
 
     async execute(): Promise<UnifiedBlockOutput> {
-        const data = await unwrap(createBlock(this.postId, this.args));
+        const data = await unwrap(createBlock(this.postId, this.args)) as UnifiedBlockOutput;
 		this.data = data;
 		return data;
     }

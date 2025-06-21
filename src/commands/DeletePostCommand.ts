@@ -41,7 +41,7 @@ export class DeletePostCommand extends BaseCommand<PostWithDetails> {
             featured: this.data.featured
         };
 
-        const data = await unwrap(createPost(input, this.args.userId));
+        const data = await unwrap(createPost(input, this.args.userId)) as PostWithDetails;
 		const blocks = this.args.blocks.map((b) => this.mapToInput(b))
         await unwrap(createBlocksInPost(data.id, blocks));
         this.data = data;

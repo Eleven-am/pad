@@ -3,7 +3,7 @@
 import { BaseCommand as IBaseCommand } from "./types";
 import { BlockType, UnifiedBlockInput, UnifiedBlockOutput } from "@/services/types";
 
-export abstract class BaseCommand<T = any> implements IBaseCommand {
+export abstract class BaseCommand<T = unknown> implements IBaseCommand {
 	postId: string;
     timestamp: number;
 
@@ -39,7 +39,6 @@ export abstract class BaseCommand<T = any> implements IBaseCommand {
 					type,
 					data: {
 						...baseData,
-						alt: data.images[0]?.alt || '',
 						caption: data.caption || undefined,
 						images: data.images.map(img => ({
 							fileId: img.fileId,

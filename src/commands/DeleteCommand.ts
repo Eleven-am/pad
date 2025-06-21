@@ -29,7 +29,7 @@ export class DeleteCommand extends BaseCommand<UnifiedBlockOutput> {
 		}
 		
 		const input = this.mapToInput (this.data);
-		const data = await unwrap (createBlock (this.postId, input));
+		const data = await unwrap (createBlock (this.postId, input)) as UnifiedBlockOutput;
 		this.data = data;
 		return data;
 	}

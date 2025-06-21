@@ -7,6 +7,10 @@ import {ThemeProvider} from "next-themes";
 import {WebsiteWrapper} from "@/components/website-wrapper";
 import {getSiteConfig} from "@/lib/data";
 import {Loading} from "@/components/loading";
+import {Toaster} from "sonner";
+import {InvitationProcessor} from "@/components/invitation-processor";
+import {auth} from "@/lib/better-auth/server";
+import {headers} from "next/headers";
 
 export const metadata: Metadata = {
 	title: "Create Next App",
@@ -37,7 +41,7 @@ const notoSans = Noto_Sans ({
 	variable: '--font-noto-sans',
 })
 
-export default function RootLayout ({children}: { children: ReactNode }) {
+export default async function RootLayout ({children}: { children: ReactNode }) {
 	return (
 		<html lang="en">
 			<body
@@ -55,10 +59,20 @@ export default function RootLayout ({children}: { children: ReactNode }) {
 					disableTransitionOnChange
 				>
 					<Suspense fallback={<Loading />}>
-						<WebsiteWrapper promise={getSiteConfig()}>
+						<WebsiteWrapper 
+							configPromise={getSiteConfig()} 
+							sessionPromise={(async () => auth.api.getSession({headers: await headers()}))()}
+						>
 							{children}
 						</WebsiteWrapper>
 					</Suspense>
+					<InvitationProcessor />
+					<Toaster 
+						position="top-right"
+						closeButton
+						richColors
+						theme="system"
+					/>
 				</ThemeProvider>
 			</body>
 		</html>

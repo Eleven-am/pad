@@ -23,7 +23,7 @@ export async function TwitterBlock({ block }: TwitterEmbedProps) {
 		avatarId
 	} = block;
 	
-	const avatarUrl = avatarId ? await unwrap(getPublicUrl(avatarId)) : null;
+	const avatarUrl = avatarId ? await unwrap(getPublicUrl(avatarId)) as string : null;
 	
 	return (
 		<Card className="border-border/50 hover:border-border/80 transition-colors overflow-hidden py-3">
@@ -56,7 +56,7 @@ export async function TwitterBlock({ block }: TwitterEmbedProps) {
 						{imageFileId && (
 							<div className="mb-3 rounded-lg overflow-hidden border border-border/30">
 								<Image
-									src={await unwrap(getPublicUrl(imageFileId))}
+									src={await unwrap(getPublicUrl(imageFileId)) as string}
 									alt="Tweet image"
 									width={500}
 									height={280}

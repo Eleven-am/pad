@@ -1,7 +1,5 @@
-import { ProfilePage as Profile } from "@/components/profile-page";
+import { ProfileServer } from "@/components/profile/profile-server";
 
 export default function ProfilePage() {
-	return (
-		<Profile />
-	);
+	return <ProfileServer />;
 }
