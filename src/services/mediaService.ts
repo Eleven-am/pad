@@ -448,8 +448,9 @@ export class MediaService {
 		return TaskEither
 			.tryCatch(
 				async () => {
-					const buffer = Buffer.from(await file.arrayBuffer());
-					await writeFile(filePath, buffer as any);
+					const arrayBuffer = await file.arrayBuffer();
+					const buffer = new Uint8Array(arrayBuffer);
+					await writeFile(filePath, buffer);
 				},
 				'Failed to save file to disk'
 			)

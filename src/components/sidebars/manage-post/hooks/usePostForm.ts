@@ -59,7 +59,7 @@ export function usePostForm(initialPost: PostWithDetails | null): [PostFormState
         }
       });
     }
-  }, [initialPost?.id, initialPost?.published, initialPost?.title, initialPost?.scheduledAt, initialPost?.categoryId, initialPost?.postTags, initialPost?.excerpt, initialPost?.excerptImageId, initialPost?.excerptByline]);
+  }, [initialPost, initialPost?.id, initialPost?.published, initialPost?.title, initialPost?.scheduledAt, initialPost?.categoryId, initialPost?.postTags, initialPost?.excerpt, initialPost?.excerptImageId, initialPost?.excerptByline]);
 
   const actions: PostFormActions = {
     setBlogName: useCallback((name: string) => {

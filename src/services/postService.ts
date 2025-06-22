@@ -17,6 +17,7 @@ type DetailedPost = Post & {
 	};
 }
 
+
 interface UpdatePostData {
 	publishedAt: Date | null;
 	title?: string;
@@ -1170,6 +1171,7 @@ export class PostService extends BaseService {
 		includeUnpublished?: boolean;
 		limit?: number;
 		includeStats?: boolean;
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	} = {}): TaskEither<any[]> {
 		const { includeUnpublished = false, limit = 50, includeStats = false } = options;
 
@@ -1254,6 +1256,7 @@ export class PostService extends BaseService {
 		limit?: number;
 		includeStats?: boolean;
 		authorId?: string;
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	} = {}): TaskEither<any[]> {
 		const { limit = 100, includeStats = false, authorId } = options;
 
@@ -1335,6 +1338,7 @@ export class PostService extends BaseService {
 		includeUnpublished?: boolean;
 		limit?: number;
 		offset?: number;
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	} = {}): TaskEither<any> {
 		const { includeUnpublished = true, limit = 20, offset = 0 } = options;
 
