@@ -1,146 +1,200 @@
-# Pad - Professional Block-Based CMS & Blogging Platform
+# Pad: Professional-Grade, Block-Based Content Platform
 
-<div align="center">
-  <h3>🚀 Create. Publish. Analyze.</h3>
-  <p>A modern, self-hosted content management system with advanced analytics</p>
-  
-  <a href="#features">Features</a> •
-  <a href="#quick-start">Quick Start</a> •
-  <a href="#docker">Docker</a> •
-  <a href="#documentation">Docs</a> •
-  <a href="#license">License</a>
-</div>
+_Unleash Your Content, Own Your Audience, Master Your Insights._
+
+[![GitHub stars](https://img.shields.io/github/stars/eleven-am/pad.svg?style=social)](https://github.com/eleven-am/pad/stargazers)
+[![License](https://img.shields.io/badge/License-GPL--3.0-blue.svg)](https://opensource.org/licenses/GPL-3.0)
+[![Docker](https://img.shields.io/badge/Docker-Ready-brightgreen.svg)](https://github.com/eleven-am/pad)
+
+![Pad Platform Hero](docs/images/hero-dashboard.png)
+*The complete content creation and analytics platform designed for professionals*
 
 ---
 
-## What is Pad?
+## The Content Creator's Dilemma
 
-Pad is a professional-grade, block-based content management and blogging platform - think Notion meets Medium with advanced publishing capabilities. It's designed for content creators, technical writers, publishers, and organizations who need sophisticated content creation tools with comprehensive analytics.
+Tired of platforms dictating your content, limiting your creativity, or holding your data hostage? Struggling to gain deep insights into your audience while juggling multiple tools for SEO, analytics, and collaboration?
 
-### ✨ Key Features
+**You need a platform that empowers rich content creation, provides actionable insights, and ensures complete ownership—without compromise.**
 
-- **🎨 13 Block Types** - Rich content blocks including text, headings, quotes, lists, images, videos, code (with syntax highlighting), tables, charts, callouts, Twitter embeds, Instagram embeds, and polls
-- **📊 Advanced Analytics** - 6 dashboard sections tracking engagement, performance, user behavior, and content metrics
-- **✏️ Professional Publishing** - SEO optimization, scheduled publishing, series support, categories, tags
-- **👥 Collaboration** - Role-based permissions (Admin, Editor, Author, Reader), real-time editing
-- **🔄 Command System** - Undo/redo support with transaction rollback
-- **🐳 Docker Ready** - Multi-architecture support (AMD64/ARM64), one-command deployment
-- **🔒 Security First** - Better Auth integration, API keys, rate limiting, secure by default
+## Enter Pad: Your Complete Content Solution
 
-## 🚀 Quick Start
+Pad is the professional-grade, self-hosted content management platform that puts you in complete control. Create stunning content with 13 versatile block types, gain deep audience insights with comprehensive analytics, and own your entire digital presence.
 
-### Using Docker (Recommended)
+### 🎨 Powerful Block-Based Content Creation
+
+Transform your ideas into compelling content with our intuitive block editor:
+
+![Block Editor in Action](docs/images/editor-blocks-demo.gif)
+*Create rich, interactive content with 13 specialized block types*
+
+**13 Block Types at Your Disposal:**
+- **Rich Text & Headings** - Professional typography with drop caps
+- **Interactive Charts** - Data visualization with customizable styling  
+- **Code Blocks** - Syntax highlighting for 50+ languages
+- **Media Galleries** - Multi-image layouts with captions
+- **Social Embeds** - Twitter and Instagram post simulations
+- **Interactive Polls** - Engage your audience with voting
+- **Tables & Lists** - Structured data presentation
+- **Callouts & Quotes** - Emphasize key information
+- **Videos** - Rich media with poster images
+
+### 📊 Built-in Analytics & Insights
+
+Track your content performance with Pad's integrated analytics dashboard:
+
+![Comprehensive Analytics Dashboard](docs/images/analytics-dashboard.png)
+*Track engagement, performance, and user behavior with detailed analytics*
+
+**Analytics That Actually Matter:**
+- **Audience Insights** - Demographics, behavior patterns, engagement metrics
+- **Content Performance** - Reading time, completion rates, popular sections
+- **Block-Level Analytics** - Which content types drive the most engagement
+- **SEO Tracking** - Keyword performance and search visibility
+- **Revenue Attribution** - Connect content to business outcomes
+- **Planning Tools** - Content calendar and strategy insights
+
+### 🚀 Professional Publishing Features
+
+**SEO Optimization** - Built-in tools for meta descriptions, focus keywords, and open graph
+**Scheduled Publishing** - Plan your content calendar with precision
+**Series Support** - Organize multi-part content for better reader experience
+**Role-Based Collaboration** - Granular permissions for teams of any size
+
+---
+
+## Why Choose Pad Over Alternatives?
+
+![Pad vs Alternatives Comparison](docs/images/comparison-table.png)
+
+| Feature | Pad | Medium | Ghost (SaaS) | Notion | WordPress |
+|---------|-----|--------|--------------|--------|-----------|
+| **Data Ownership** | ✅ Full Control | ❌ Platform Owned | ❌ Vendor Lock-in | ❌ Platform Owned | ⚠️ Self-hosted Only |
+| **Advanced Analytics** | ✅ 6 Dashboard Sections | ❌ Basic Stats | ⚠️ Limited | ❌ None | ⚠️ Plugin Required |
+| **Block Variety** | ✅ 13 Specialized Blocks | ❌ Basic Text | ⚠️ Limited | ⚠️ Generic Blocks | ⚠️ Gutenberg Only |
+| **Team Collaboration** | ✅ Real-time + Permissions | ❌ Publications Only | ✅ Good | ✅ Excellent | ⚠️ Plugin Required |
+| **Self-Hosted** | ✅ Docker Ready | ❌ No Option | ⚠️ Expensive | ❌ No Option | ✅ Complex Setup |
+| **Professional SEO** | ✅ Built-in | ❌ Limited | ✅ Good | ❌ Poor | ⚠️ Plugin Required |
+
+**Pad gives you everything you need in one professional package—no plugins, no vendor lock-in, no compromises.**
+
+---
+
+## Perfect For These Professionals
+
+### 📝 Technical Writers & Documentation Teams
+Create precise, code-rich articles with dedicated syntax highlighting, version control, and team collaboration features.
+
+### 📈 Marketing Agencies & Brands  
+Build compelling campaigns with social embeds, interactive polls, and detailed analytics to prove ROI to clients.
+
+### 🏢 Publishers & Media Organizations
+Manage multiple authors, schedule releases across series, and track performance with built-in SEO optimization.
+
+### 🎯 Independent Creators & Bloggers
+Gain complete control over your platform, audience data, and monetization without platform restrictions.
+
+---
+
+## Get Started in Minutes
+
+Pad is designed for effortless deployment with Docker:
+
+![Docker Installation Flow](docs/images/docker-setup-flow.png)
+*Deploy Pad in minutes with our Docker-ready setup*
+
+### 🐳 Quick Start with Docker
 
 ```bash
-# Pull and run
+# Pull and run - that's it!
 docker run -d \
   -p 3000:3000 \
   -v pad_data:/app/data \
   -e DATABASE_URL=file:/app/data/pad.db \
+  -e SECRET=your-secret-key-here \
   ghcr.io/eleven-am/pad:latest
 
-# Or use Docker Compose
+# Open http://localhost:3000 and start creating!
+```
+
+### 📋 Docker Compose (Recommended)
+
+```bash
+# Download and start
 curl -O https://raw.githubusercontent.com/eleven-am/pad/main/docker-compose.example.yml
 docker-compose up -d
 ```
 
-### Development Setup
+### 🛠 Development Setup
 
 ```bash
-# Clone the repository
 git clone https://github.com/eleven-am/pad.git
 cd pad
-
-# Install dependencies
 npm install
 
-# Generate Prisma client
-npm run db:generate
+# Initialize database  
+npm run db:generate && npm run db:push && npm run db:init
 
-# Initialize database
-npm run db:push
-npm run db:init
-
-# Start development server
+# Start development
 npm run dev
 ```
 
-Visit `http://localhost:3000` to see your Pad instance running!
 
-## 📚 Documentation
+---
 
-- [Docker Setup](./DOCKER.md) - Detailed Docker deployment guide
-- [Database Guide](./DOCKER-DATABASE.md) - Database configuration and management
-- [Development](./CLAUDE.md) - Architecture and development guide
-- [Claude Code Guide](./.claude/README.md) - AI assistant configuration
+## Frequently Asked Questions
 
-## 🏗️ Architecture
+<details>
+<summary><strong>Is Pad completely open source?</strong></summary>
+Yes! Pad is licensed under GPL-3.0, giving you full access to the source code and the freedom to modify it for your needs.
+</details>
 
-Pad is built with modern web technologies:
+<details>
+<summary><strong>What are the minimum system requirements?</strong></summary>
+Pad runs efficiently with 1GB RAM and 2GB storage. Any system capable of running Docker can host Pad.
+</details>
 
-- **Frontend**: Next.js 15, React 19, TypeScript, Tailwind CSS
-- **Backend**: Next.js App Router, Prisma ORM
-- **Database**: SQLite (default), PostgreSQL, MySQL supported
-- **Auth**: Better Auth with social providers
-- **UI**: Shadcn/ui components, Radix UI
-- **Analytics**: Built-in comprehensive analytics system
+<details>
+<summary><strong>Can I import content from other platforms?</strong></summary>
+We're building import tools for major platforms. Currently, you can migrate content manually through our intuitive editor.
+</details>
 
-## 🎯 Use Cases
+<details>
+<summary><strong>Is there a hosted version available?</strong></summary>
+Pad is designed to be self-hosted to ensure you maintain complete control over your content and data. This approach eliminates vendor lock-in and recurring fees.
+</details>
 
-- **Professional Blogging** - Full-featured blogging with SEO and analytics
-- **Technical Documentation** - Code blocks, charts, and structured content
-- **Content Marketing** - Analytics-driven content creation
-- **Team Publishing** - Multi-author support with permissions
-- **Knowledge Base** - Organize content with categories and series
+<details>
+<summary><strong>How do I update Pad?</strong></summary>
+Updates are simple with Docker: `docker pull ghcr.io/eleven-am/pad:latest` followed by restarting your container.
+</details>
 
-## 🐳 Docker Deployment
+---
 
-Pad provides official multi-architecture Docker images:
+## Contributing
 
-```yaml
-version: '3.8'
-services:
-  pad:
-    image: ghcr.io/eleven-am/pad:latest
-    ports:
-      - "3000:3000"
-    environment:
-      - DATABASE_URL=file:/app/data/pad.db
-      - SECRET=your-secret-key-here
-    volumes:
-      - pad_data:/app/data
-    restart: unless-stopped
+Pad thrives on community contributions! Whether you're fixing bugs, adding features, improving documentation, or suggesting new block types—your help makes Pad better for everyone.
 
-volumes:
-  pad_data:
-```
+**🚀 [Contribution Guidelines](./CONTRIBUTING.md)** | **💡 [Feature Requests](https://github.com/eleven-am/pad/issues/new?template=feature_request.md)**
 
-## 🔧 Configuration
+---
 
-Key environment variables:
+## License & Credits
 
-- `DATABASE_URL` - Database connection string
-- `SECRET` - Session encryption key
-- `NEXT_PUBLIC_BASE_URL` - Public URL of your instance
-- `GOOGLE_CLIENT_ID/SECRET` - Google OAuth (optional)
-- `GITHUB_CLIENT_ID/SECRET` - GitHub OAuth (optional)
+This project is licensed under the **GPL-3.0 License** - see the [LICENSE](LICENSE) file for details.
 
-## 🤝 Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-## 📄 License
-
-This project is licensed under the GPL-3.0 License - see the [LICENSE](LICENSE) file for details.
-
-**Important**: This software is provided "as is", without warranty of any kind. The authors are not responsible for any data loss or damages arising from the use of this software.
-
-## 🙏 Acknowledgments
-
-Built with ❤️ by [Roy OSSAI](https://github.com/eleven-am)
+**Built with ❤️ by [Roy OSSAI](https://github.com/eleven-am)**
 
 ---
 
 <div align="center">
-  <p>If you find Pad useful, please consider giving it a ⭐ on GitHub!</p>
+
+![Pad Platform Features](docs/images/features-overview.png)
+
+**Ready to revolutionize your content creation?**
+
+⭐ **Star this project** and take control of your digital narrative!
+
+[🚀 **Get Started**](#get-started-in-minutes) • [🐛 **Issues**](https://github.com/eleven-am/pad/issues) • [💬 **Community**](https://github.com/eleven-am/pad/discussions)
+
 </div>

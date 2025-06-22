@@ -1,0 +1,31 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pad-data-pvc
+  namespace: pad
+  labels:
+    app: pad
+    component: data
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: nfs  # Using existing NFS storage class
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pad-uploads-pvc
+  namespace: pad
+  labels:
+    app: pad
+    component: uploads
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: nfs  # Using existing NFS storage class
+  resources:
+    requests:
+      storage: 50Gi  # More space for user uploads

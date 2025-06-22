@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pad-config
+  namespace: pad
+  labels:
+    app: pad
+data:
+  NODE_ENV: "production"
+  PORT: "3000"
+  HOSTNAME: "0.0.0.0"
+  NEXT_TELEMETRY_DISABLED: "1"
+  DATABASE_URL: "file:/app/data/pad.db"
+  NEXT_PUBLIC_BASE_URL: "https://pad.example.com"  # Update with your actual domain

@@ -1,0 +1,52 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: pad-route
+  namespace: pad
+  labels:
+    app: pad
+spec:
+  parentRefs:
+    - name: gateway  # Replace with your actual Gateway name
+      namespace: gateway-system  # Replace with your Gateway namespace
+  hostnames:
+    - "pad.example.com"  # Replace with your actual domain
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: pad-service
+          port: 80
+          weight: 100
+---
+# Alternative Ingress configuration if you're using Ingress instead of Gateway API
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: pad-ingress
+  namespace: pad
+  labels:
+    app: pad
+  annotations:
+    # nginx.ingress.kubernetes.io/rewrite-target: /
+    # cert-manager.io/cluster-issuer: "letsencrypt-prod"  # If using cert-manager
+    # nginx.ingress.kubernetes.io/ssl-redirect: "true"
+spec:
+  ingressClassName: nginx  # Replace with your ingress class
+  rules:
+    - host: pad.example.com  # Replace with your actual domain
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: pad-service
+                port:
+                  number: 80
+  # tls:
+  #   - secretName: pad-tls
+  #     hosts:
+  #       - pad.example.com

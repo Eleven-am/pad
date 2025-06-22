@@ -85,7 +85,7 @@ COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
 COPY --from=builder --chown=nextjs:nodejs /app/scripts/db-init.js ./scripts/db-init.js
 COPY --from=builder --chown=nextjs:nodejs /app/src/generated/prisma ./src/generated/prisma
 
-# Create entrypoint script as root
+# Create entrypoint script and set permissions
 RUN echo '#!/bin/sh\n\
 set -e\n\
 echo "🔧 Initializing Pad..."\n\
