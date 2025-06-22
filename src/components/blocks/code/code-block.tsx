@@ -107,7 +107,7 @@ export function CodeBlock({ block, className }: CodeBlockProps) {
 						userSelect: 'none'
 					}}
 					lineProps={(lineNumber) => {
-						const isHighlighted = highlightLines.includes(lineNumber);
+						const isHighlighted = (highlightLines as number[] | null)?.includes(lineNumber) || false;
 						return {
 							style: {
 								display: 'block',

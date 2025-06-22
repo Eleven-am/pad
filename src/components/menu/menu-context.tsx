@@ -3,7 +3,7 @@
 import { createContext, useContext, useState, ReactNode } from 'react';
 import { UnifiedBlockOutput, BlockType } from '@/services/types';
 
-export type MenuPanel = 'post' | 'blocks' | 'queue' | 'collaborate' | 'view' | null;
+export type MenuPanel = 'post' | 'blocks' | 'collaborate' | 'view' | null;
 
 export type BlocksSubPanel = 'select' | 'edit' | null;
 export type CollaborateSubPanel = 'activity' | 'manage' | 'invite' | null;

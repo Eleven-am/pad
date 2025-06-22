@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { Menu, Moon, Search, Sun } from "lucide-react"
+import { Menu, Moon, Search, Sun, User, Settings, BarChart3, LogOut, FileText } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -11,6 +11,8 @@ import { SiteConfig } from "@/lib/config"
 import { useTheme } from "next-themes";
 import { useMounted } from "@/hooks/useMounted";
 import { AuthSession } from "@/types/auth";
+import { UserProfileDropdown } from "@/components/user-profile-dropdown";
+import { useRouter, usePathname } from "next/navigation";
 
 interface FooterProps {
 	config: SiteConfig
@@ -30,9 +32,12 @@ interface WebsiteWrapperProps {
 function Header({ config, session }: HeaderProps) {
 	const mounted = useMounted();
 	const {theme, setTheme} = useTheme();
+	const router = useRouter();
+	const pathname = usePathname();
 	const loggedIn = !!session?.user;
 	const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 	const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+	const [searchQuery, setSearchQuery] = useState("");
 	
 	// For now, we'll use the image from OAuth providers
 	// TODO: Implement fetching extended user data with avatarFileId
@@ -41,6 +46,29 @@ function Header({ config, session }: HeaderProps) {
 			setAvatarUrl(session.user.image);
 		}
 	}, [session]);
+
+	const handleSearch = (e: React.FormEvent) => {
+		e.preventDefault();
+		if (searchQuery.trim()) {
+			router.push(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
+		} else {
+			router.push('/search');
+		}
+	};
+
+	const handleSearchKeyDown = (e: React.KeyboardEvent) => {
+		if (e.key === 'Enter') {
+			handleSearch(e);
+		}
+	};
+
+	// Helper function to check if a route is active
+	const isRouteActive = (href: string) => {
+		if (href === '/') {
+			return pathname === '/';
+		}
+		return pathname.startsWith(href);
+	};
 	
 	return (
 		<header className="sticky flex items-center justify-center top-0 z-50 w-full border-b border-border/40 bg-background/80 backdrop-blur-sm">
@@ -55,7 +83,7 @@ function Header({ config, session }: HeaderProps) {
 								key={link.label}
 								href={link.href}
 								className={`text-sm font-medium transition-colors hover:text-primary ${
-									link.href === "/" ? "text-primary" : "text-muted-foreground"
+									isRouteActive(link.href) ? "text-primary" : "text-muted-foreground"
 								}`}
 							>
 								{link.label}
@@ -63,19 +91,22 @@ function Header({ config, session }: HeaderProps) {
 						))}
 					</nav>
 					
-					<div className="relative hidden md:block group">
+					<form onSubmit={handleSearch} className="relative hidden md:block group">
 						<Search
 							className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-hover:text-primary pointer-events-none z-10"/>
 						<Input
 							type="search"
-							placeholder="Search..."
+							placeholder="Search articles..."
+							value={searchQuery}
+							onChange={(e) => setSearchQuery(e.target.value)}
+							onKeyDown={handleSearchKeyDown}
 							className="h-9 w-9 rounded-full bg-background md:bg-transparent md:dark:bg-[transparent] pl-8 text-sm border border-transparent
-                         group-hover:w-[200px] group-hover:rounded-md group-hover:border-input
-                         focus:w-[230px] focus:rounded-md focus:border-primary focus:pl-8 focus:pr-2 md:shadow-none md:hover:shadow-xs
+                         group-hover:w-[220px] group-hover:rounded-md group-hover:border-input
+                         focus:w-[250px] focus:rounded-md focus:border-primary focus:pl-8 focus:pr-2 md:shadow-none md:hover:shadow-xs
                          placeholder:text-transparent group-hover:placeholder:text-muted-foreground focus:placeholder:text-muted-foreground
                          transition-all duration-300 ease-in-out"
 						/>
-					</div>
+					</form>
 					
 					{mounted && (
 						<div className="hidden md:block">
@@ -88,17 +119,9 @@ function Header({ config, session }: HeaderProps) {
 					)}
 					
 					{loggedIn && (
-						<Link href="/profile" className="hidden md:block">
-							<Avatar className="h-8 w-8 cursor-pointer transition-all hover:ring-2 hover:ring-primary hover:ring-offset-2">
-								<AvatarImage 
-									src={avatarUrl || session?.user?.image || undefined} 
-									alt={session?.user?.name || "User Avatar"}
-								/>
-								<AvatarFallback>
-									{session?.user?.name?.charAt(0)?.toUpperCase() || session?.user?.email?.charAt(0)?.toUpperCase() || 'U'}
-								</AvatarFallback>
-							</Avatar>
-						</Link>
+						<div className="hidden md:block">
+							<UserProfileDropdown session={session} />
+						</div>
 					)}
 					
 					<div className="md:hidden">
@@ -117,11 +140,18 @@ function Header({ config, session }: HeaderProps) {
 									</Link>
 									
 									{/* Mobile Search */}
-									<div className="relative">
+									<form onSubmit={handleSearch} className="relative">
 										<Search
 											className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground"/>
-										<Input type="search" placeholder="Search..." className="w-full pl-8 h-9"/>
-									</div>
+										<Input 
+											type="search" 
+											placeholder="Search articles..." 
+											value={searchQuery}
+											onChange={(e) => setSearchQuery(e.target.value)}
+											onKeyDown={handleSearchKeyDown}
+											className="w-full pl-8 h-9"
+										/>
+									</form>
 									
 									{/* Mobile Navigation Links */}
 									<nav className="flex flex-col space-y-2">
@@ -129,7 +159,9 @@ function Header({ config, session }: HeaderProps) {
 											<Link
 												key={link.label}
 												href={link.href}
-												className="text-muted-foreground hover:text-primary py-1"
+												className={`py-1 transition-colors hover:text-primary ${
+													isRouteActive(link.href) ? "text-primary font-medium" : "text-muted-foreground"
+												}`}
 												onClick={() => setIsMobileMenuOpen (false)}
 											>
 												{link.label}
@@ -153,23 +185,89 @@ function Header({ config, session }: HeaderProps) {
 									)}
 									
 									{loggedIn && (
-										<div className="border-t pt-4 mt-auto">
-											<Link 
-												href="/profile" 
-												className="flex items-center gap-2 hover:bg-accent rounded-md p-2 -m-2 transition-colors"
-												onClick={() => setIsMobileMenuOpen(false)}
-											>
-												<Avatar className="h-8 w-8">
+										<div className="border-t pt-4 mt-auto space-y-2">
+											{/* User info header */}
+											<div className="flex items-center gap-3 p-2 bg-muted/30 rounded-lg">
+												<Avatar className="h-10 w-10">
 													<AvatarImage 
 														src={avatarUrl || session?.user?.image || undefined}
 														alt={session?.user?.name || "User Avatar"}
 													/>
-													<AvatarFallback>
+													<AvatarFallback className="bg-gradient-to-br from-primary/20 to-primary/10 text-primary font-medium">
 														{session?.user?.name?.charAt(0)?.toUpperCase() || session?.user?.email?.charAt(0)?.toUpperCase() || 'U'}
 													</AvatarFallback>
 												</Avatar>
-												<span className="text-sm font-medium">{session?.user?.name || 'User Profile'}</span>
-											</Link>
+												<div className="flex flex-col min-w-0">
+													<div className="font-medium text-sm truncate">{session?.user?.name || 'User'}</div>
+													{session?.user?.email && (
+														<div className="text-xs text-muted-foreground truncate">{session?.user?.email}</div>
+													)}
+												</div>
+											</div>
+											
+											{/* User menu items */}
+											<div className="space-y-1">
+												<Link 
+													href="/profile" 
+													className={`flex items-center gap-3 hover:bg-accent rounded-md p-2 transition-colors ${
+														isRouteActive('/profile') ? 'bg-accent' : ''
+													}`}
+													onClick={() => setIsMobileMenuOpen(false)}
+												>
+													<User className={`h-4 w-4 ${isRouteActive('/profile') ? 'text-primary' : 'text-muted-foreground'}`} />
+													<span className={`text-sm font-medium ${isRouteActive('/profile') ? 'text-primary' : ''}`}>Profile</span>
+												</Link>
+												<Link 
+													href="/my-posts" 
+													className={`flex items-center gap-3 hover:bg-accent rounded-md p-2 transition-colors ${
+														isRouteActive('/my-posts') ? 'bg-accent' : ''
+													}`}
+													onClick={() => setIsMobileMenuOpen(false)}
+												>
+													<FileText className={`h-4 w-4 ${isRouteActive('/my-posts') ? 'text-primary' : 'text-muted-foreground'}`} />
+													<span className={`text-sm font-medium ${isRouteActive('/my-posts') ? 'text-primary' : ''}`}>My Posts</span>
+												</Link>
+												<Link 
+													href="/dashboard" 
+													className={`flex items-center gap-3 hover:bg-accent rounded-md p-2 transition-colors ${
+														isRouteActive('/dashboard') ? 'bg-accent' : ''
+													}`}
+													onClick={() => setIsMobileMenuOpen(false)}
+												>
+													<BarChart3 className={`h-4 w-4 ${isRouteActive('/dashboard') ? 'text-primary' : 'text-muted-foreground'}`} />
+													<span className={`text-sm font-medium ${isRouteActive('/dashboard') ? 'text-primary' : ''}`}>Dashboard</span>
+												</Link>
+												<Link 
+													href="/settings" 
+													className={`flex items-center gap-3 hover:bg-accent rounded-md p-2 transition-colors ${
+														isRouteActive('/settings') ? 'bg-accent' : ''
+													}`}
+													onClick={() => setIsMobileMenuOpen(false)}
+												>
+													<Settings className={`h-4 w-4 ${isRouteActive('/settings') ? 'text-primary' : 'text-muted-foreground'}`} />
+													<span className={`text-sm font-medium ${isRouteActive('/settings') ? 'text-primary' : ''}`}>Settings</span>
+												</Link>
+												<button 
+													className="flex items-center gap-3 hover:bg-destructive/10 text-destructive rounded-md p-2 transition-colors w-full text-left"
+													onClick={async () => {
+														setIsMobileMenuOpen(false);
+														try {
+															const response = await fetch('/api/auth/sign-out', {
+																method: 'POST',
+																credentials: 'include',
+															});
+															if (response.ok) {
+																window.location.href = '/';
+															}
+														} catch (error) {
+															console.error('Sign out error:', error);
+														}
+													}}
+												>
+													<LogOut className="h-4 w-4" />
+													<span className="text-sm font-medium">Sign out</span>
+												</button>
+											</div>
 										</div>
 									)}
 								</div>

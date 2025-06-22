@@ -35,8 +35,6 @@ export class UpdatePostCommand extends BaseCommand<PostWithDetails> {
                 categoryId: this.args.previousState.categoryId || undefined,
                 seriesId: this.args.previousState.seriesId || undefined,
                 seriesOrder: this.args.previousState.seriesOrder || undefined,
-                metaTitle: this.args.previousState.metaTitle || undefined,
-                metaDescription: this.args.previousState.metaDescription || undefined,
                 focusKeyword: this.args.previousState.focusKeyword || undefined,
                 published: this.args.previousState.published,
                 scheduledAt: this.args.previousState.scheduledAt,

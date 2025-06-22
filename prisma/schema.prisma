@@ -10,7 +10,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
@@ -18,7 +18,7 @@ model User {
   id        String   @id @default(cuid())
   email     String   @unique
   name      String?
-  bio       String?  @db.Text
+  bio       String?
   role      UserRole @default(AUTHOR)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -60,8 +60,10 @@ model Post {
   id          String    @id @default(cuid())
   title       String
   slug        String    @unique
-  excerpt     String?
-  published   Boolean   @default(false)
+  excerpt         String?
+  excerptImageId  String? // Featured image for excerpt display
+  excerptByline   String? // Custom byline/tagline for excerpt
+  published       Boolean   @default(false)
   publishedAt DateTime?
   scheduledAt DateTime? // For scheduled publishing
   featured    Boolean   @default(false) // Featured posts
@@ -70,11 +72,7 @@ model Post {
   authorId    String
 
   // SEO metadata
-  metaTitle       String?
-  metaDescription String? @db.Text
-  ogImage         String? // Open Graph image URL
-  canonicalUrl    String? // Canonical URL for SEO
-  focusKeyword    String? // Primary SEO keyword
+  focusKeyword    String? // Primary SEO keyword for tracking/optimization
 
   // Audio narration
   audioFileId      String?
@@ -270,7 +268,7 @@ model PostSeries {
   id          String  @id @default(cuid())
   title       String
   slug        String  @unique
-  description String? @db.Text
+  description String?
 
   posts Post[]
 
@@ -315,7 +313,7 @@ model WebhookEndpoint {
   id          String   @id @default(cuid())
   url         String
   secret      String // For signature verification
-  events      String[] // Array of event types to listen for
+  events      Json // Array of event types to listen for
   active      Boolean  @default(true)
   description String?
 
@@ -349,7 +347,7 @@ model WebhookDelivery {
 
 model TextBlock {
   id         String  @id @default(cuid())
-  text       String  @db.Text
+  text       String
   blockName  String  @default("Text")
   hasDropCap Boolean @default(false)
   position   Int // For ordering within post
@@ -388,7 +386,7 @@ model VideoBlock {
 model QuoteBlock {
   id        String  @id @default(cuid())
   blockName String  @default("Quote")
-  quote     String  @db.Text
+  quote     String
   author    String?
   source    String?
   position  Int // For ordering within post
@@ -440,7 +438,7 @@ model Callout {
   blockName String      @default("Callout")
   type      CalloutType
   title     String?
-  content   String      @db.Text // HTML content
+  content   String      // HTML content
   position  Int // For ordering within post
 
   postId String
@@ -467,13 +465,13 @@ enum CalloutType {
 model CodeBlock {
   id              String  @id @default(cuid())
   blockName       String  @default("Code")
-  codeText        String  @db.Text
+  codeText        String
   language        String  @default("javascript")
   showLineNumbers Boolean @default(true)
   title           String?
   maxHeight       Int     @default(400)
   startLine       Int     @default(1)
-  highlightLines  Int[] // Array of line numbers to highlight
+  highlightLines  Json? // Array of line numbers to highlight
   position        Int // For ordering within post
 
   postId String
@@ -511,7 +509,7 @@ model TwitterBlock {
   blockName String  @default("Twitter")
   username  String
   handle    String
-  content   String  @db.Text
+  content   String
   date      String
   likes     Int     @default(0)
   retweets  Int     @default(0)
@@ -558,7 +556,7 @@ model InstagramBlock {
   location    String?
   date        String
   instagramId String
-  caption     String?         @db.Text
+  caption     String?
   likes       Int
   comments    Int
   verified    Boolean         @default(false)
@@ -620,7 +618,7 @@ model ChartBlock {
 
   xAxis  String
   yAxis  String
-  series String[]
+  series Json // Array of chart series data
 
   position Int
 
@@ -960,7 +958,7 @@ model SiteConfig {
   
   // Basic Site Info
   siteName        String   @default("Pad Blog")
-  siteDescription String?  @db.Text
+  siteDescription String?
   siteTagline     String?
   
   // Logo and Branding
@@ -977,7 +975,7 @@ model SiteConfig {
   instagramUrl    String?
   
   // SEO Settings
-  seoKeywords     String?  @db.Text
+  seoKeywords     String?
   googleAnalytics String?
   gtmId           String?
   
@@ -1001,4 +999,15 @@ model SiteConfig {
   
   // Only one site config should exist (singleton pattern)
   @@map("site_config")
+}
+
+model Newsletter {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  subscribedAt  DateTime @default(now())
+  isActive      Boolean  @default(true)
+  unsubscribedAt DateTime?
+  source        String?  // Where they subscribed from (homepage, post, etc.)
+  
+  @@map("newsletters")
 }

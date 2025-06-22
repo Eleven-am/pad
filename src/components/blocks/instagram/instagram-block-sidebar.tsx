@@ -72,7 +72,7 @@ export function InstagramBlockSidebar({onClose, onSave, onDelete, isUpdate, init
 			const result = await unwrap(createInstagramPost(postId, session.user.id, url)) as UnifiedBlockOutput;
 			if (result.type === BlockType.INSTAGRAM) {
 				setFetchedData(result.data as CreateInstagramBlockInput);
-				await loadPost(postId, true, result);
+				await loadPost(postId, session.user.id, result);
 			}
 		} catch (error) {
 			console.error("Error fetching Instagram data:", error);

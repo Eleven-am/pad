@@ -198,5 +198,46 @@ export class UserService {
 				lastActiveAt: this.getUserById(userId).map((user) => user.updatedAt),
 			});
 	}
+
+	/**
+	 * Permanently deletes a user and all associated data
+	 * This includes posts, files, collaborations, etc.
+	 * 
+	 * @param userId - ID of user to delete
+	 * @returns Promise resolving when deletion is complete
+	 * @throws Error if user not found or deletion fails
+	 */
+	deleteUser(userId: string): TaskEither<void> {
+		return this.getUserById(userId)
+			.chain(() => TaskEither.tryCatch(
+				() => this.prisma.$transaction(async (tx) => {
+					// Get user's uploaded files for physical cleanup
+					const userFiles = await tx.file.findMany({
+						where: { uploaderId: userId },
+						select: { id: true }
+					});
+
+					// Delete files using media service for proper cleanup
+					// This handles physical file deletion from storage
+					for (const file of userFiles) {
+						await this.mediaService.deleteFile(file.id, userId).toPromise();
+					}
+
+					// Delete the user - cascade will handle most related records:
+					// - Files (uploaderId cascade)
+					// - Posts and all their blocks (authorId cascade) 
+					// - PostReads, PostViews, PostLikes, PostBookmarks (userId cascade)
+					// - PostCollaborator (userId cascade)
+					// - Sessions, Accounts (userId cascade via Better Auth)
+					// - API keys (userId cascade)
+					await tx.user.delete({
+						where: { id: userId }
+					});
+				}),
+				'Failed to delete user account'
+			))
+			.map(() => undefined);
+	}
+
 }
 

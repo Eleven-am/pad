@@ -5,10 +5,12 @@ import { Button } from "@/components/ui/button"
 import { SiteConfig } from "@/lib/config"
 import { useCallback } from "react"
 import { authClient } from "@/lib/better-auth/client"
+import Link from "next/link"
 
 interface AuthComponentProps {
 	config: SiteConfig;
 	icon: ReactNode;
+	redirectTo?: string;
 }
 
 enum OAuthProvider {
@@ -16,19 +18,19 @@ enum OAuthProvider {
 	GOOGLE = 'google',
 }
 
-export function AuthComponent({ config, icon }: AuthComponentProps) {
+export function AuthComponent({ config, icon, redirectTo }: AuthComponentProps) {
 	const handleOAuthLogin = useCallback((provider: OAuthProvider) => {
 		return async () => {
 			try {
 				await authClient.signIn.social({
 					provider: provider,
-					callbackURL: '/blogs/featured',
+					callbackURL: redirectTo || '/',
 				});
 			} catch (error) {
 				console.error(`${provider} login failed:`, error);
 			}
 		}
-	}, []);
+	}, [redirectTo]);
 
 	return (
 		<div className="absolute inset-0 flex items-center justify-center overflow-hidden">
@@ -78,10 +80,10 @@ export function AuthComponent({ config, icon }: AuthComponentProps) {
 				</div>
 				<div className="flex flex-col gap-2">
 					<div className="text-balance text-center text-xs text-muted-foreground [&_a]:underline [&_a]:underline-offset-4 hover:[&_a]:text-primary">
-						By clicking continue, you agree to our <a href="#">Terms of Service</a> and <a href="#">Privacy Policy</a>.
+						By clicking continue, you agree to our <Link href="/terms">Terms of Service</Link> and <Link href="/privacy">Privacy Policy</Link>.
 					</div>
 					<div className="text-balance text-center text-xs text-muted-foreground [&_a]:underline [&_a]:underline-offset-4 hover:[&_a]:text-primary">
-						Powered by <a>Pad</a> Copyright © {new Date().getFullYear()} by <a href="https://royossai.com">Roy Ossai</a>
+						Powered by <a>Pad</a> Copyright © {new Date().getFullYear()} by <a href="https://github.com/eleven-am">Roy Ossai</a>
 					</div>
 				</div>
 			</div>

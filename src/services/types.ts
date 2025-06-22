@@ -64,7 +64,7 @@ export interface CreateCodeBlockInput extends BaseBlockInput {
 	title?: string;
 	maxHeight?: number;
 	startLine?: number;
-	highlightLines?: number[];
+	highlightLines?: number[]; // Will be converted to JSON string for SQLite storage
 }
 
 export interface CreateTableBlockInput extends BaseBlockInput {
@@ -129,7 +129,7 @@ export interface CreateChartBlockInput extends BaseBlockInput {
 	fileId: string;
 	xAxis: string;
 	yAxis: string;
-	series: string[];
+	series: string[]; // Will be converted to JSON string for SQLite storage
 	
 	orientation?: Orientation;
 	labelPosition?: LabelPosition;

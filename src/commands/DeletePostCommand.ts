@@ -33,8 +33,6 @@ export class DeletePostCommand extends BaseCommand<PostWithDetails> {
             categoryId: this.data.categoryId || undefined,
             seriesId: this.data.seriesId || undefined,
             seriesOrder: this.data.seriesOrder || undefined,
-            metaTitle: this.data.metaTitle || undefined,
-            metaDescription: this.data.metaDescription || undefined,
             focusKeyword: this.data.focusKeyword || undefined,
             published: this.data.published,
             scheduledAt: this.data.scheduledAt || undefined,

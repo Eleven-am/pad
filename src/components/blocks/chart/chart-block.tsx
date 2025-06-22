@@ -30,7 +30,7 @@ function Chart({ block, className, promise }: ChartProps) {
 			xAxis: block.xAxis,
 			yAxis: block.yAxis,
 			chartType: block.type,
-			series: block.series,
+			series: block.series as string[],
 		};
 		
 		return prepareChartData(formattedData, chartOptions);

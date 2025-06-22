@@ -10,6 +10,9 @@ interface PostFormState {
   scheduledDate: Date | undefined;
   category: string;
   selectedTags: string[];
+  excerpt: string;
+  excerptImageId: string;
+  excerptByline: string;
 }
 
 interface PostFormActions {
@@ -18,16 +21,22 @@ interface PostFormActions {
   setScheduledDate: (date: Date | undefined) => void;
   setCategory: (category: string) => void;
   setSelectedTags: (tags: string[]) => void;
+  setExcerpt: (excerpt: string) => void;
+  setExcerptImageId: (imageId: string) => void;
+  setExcerptByline: (byline: string) => void;
   resetForm: () => void;
 }
 
 export function usePostForm(initialPost: PostWithDetails | null): [PostFormState, PostFormActions] {
   const initialState: PostFormState = {
     blogName: initialPost?.title || "",
-    isDraft: !initialPost?.published || true,
+    isDraft: initialPost ? !initialPost.published : true,
     scheduledDate: initialPost?.scheduledAt ? new Date(initialPost.scheduledAt) : undefined,
     category: initialPost?.categoryId || "",
     selectedTags: initialPost?.postTags?.map((tag) => tag.tagId) || [],
+    excerpt: initialPost?.excerpt || "",
+    excerptImageId: initialPost?.excerptImageId || "",
+    excerptByline: initialPost?.excerptByline || "",
   };
 
   const reducer = createFormReducer(initialState);
@@ -40,14 +49,17 @@ export function usePostForm(initialPost: PostWithDetails | null): [PostFormState
         type: 'UPDATE',
         payload: {
           blogName: initialPost.title || "",
-          isDraft: !initialPost.published || true,
+          isDraft: !initialPost.published,
           scheduledDate: initialPost.scheduledAt ? new Date(initialPost.scheduledAt) : undefined,
           category: initialPost.categoryId || "",
           selectedTags: initialPost.postTags?.map((tag) => tag.tagId) || [],
+          excerpt: initialPost.excerpt || "",
+          excerptImageId: initialPost.excerptImageId || "",
+          excerptByline: initialPost.excerptByline || "",
         }
       });
     }
-  }, [initialPost]);
+  }, [initialPost?.id, initialPost?.published, initialPost?.title, initialPost?.scheduledAt, initialPost?.categoryId, initialPost?.postTags, initialPost?.excerpt, initialPost?.excerptImageId, initialPost?.excerptByline]);
 
   const actions: PostFormActions = {
     setBlogName: useCallback((name: string) => {
@@ -68,6 +80,18 @@ export function usePostForm(initialPost: PostWithDetails | null): [PostFormState
 
     setSelectedTags: useCallback((tags: string[]) => {
       dispatch({ type: 'UPDATE', payload: { selectedTags: tags } });
+    }, []),
+
+    setExcerpt: useCallback((excerpt: string) => {
+      dispatch({ type: 'UPDATE', payload: { excerpt } });
+    }, []),
+
+    setExcerptImageId: useCallback((imageId: string) => {
+      dispatch({ type: 'UPDATE', payload: { excerptImageId: imageId } });
+    }, []),
+
+    setExcerptByline: useCallback((byline: string) => {
+      dispatch({ type: 'UPDATE', payload: { excerptByline: byline } });
     }, []),
 
     resetForm: useCallback(() => {

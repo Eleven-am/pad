@@ -167,12 +167,10 @@ export class SiteConfigService extends BaseService {
 			.tryCatch (
 				() => this.prisma.siteConfig.create ({
 					data: {
-						siteName: 'Orin',
+						siteName: 'Pad',
 						footerLinks: JSON.stringify ([
-							{label: "About This Blog", href: "/about-this-instance"},
-							{label: "Featured Posts", href: "/blog/featured"},
-							{label: "Contact", href: "/instance-contact"},
-							{label: "Privacy", href: "/instance-privacy"},
+							{label: "Privacy Policy", href: "/privacy"},
+							{label: "Terms of Service", href: "/terms"},
 						]),
 						navLinks: JSON.stringify ([
 							{label: "Dashboard", href: "/dashboard"},

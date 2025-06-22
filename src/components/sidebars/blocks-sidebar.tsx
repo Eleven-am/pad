@@ -6,8 +6,16 @@ import { BlogArticle } from "../blog-article";
 import { User } from "better-auth";
 import { CollaborationProvider } from "@/components/collaboration";
 import { MenuProvider, MenuBar, KeyboardShortcuts, CommandFeedback } from "@/components/menu";
+import {AuthorWithAvatar} from "@/lib/blog-authors";
 
-export function BlocksSidebar (state: ServerState & { user: User }) {
+interface BlocksSidebarProps  extends ServerState {
+	user: User;
+	authorsPromise: Promise<{
+		allAuthors: AuthorWithAvatar[]
+	}>
+}
+
+export function BlocksSidebar (state: BlocksSidebarProps) {
 	const {acceptServerState} = useBlockPostActions ();
 	const {post, blocks, analysis, tracker} = useBlockPostState ((state) => ({
 		post: state.post,
@@ -16,10 +24,7 @@ export function BlocksSidebar (state: ServerState & { user: User }) {
 		tracker: state.tracker
 	}));
 	
-	useEffect (() => acceptServerState (state), [state, acceptServerState]);
-	
-	// Create a dummy authorsPromise for edit mode (not actually used since we have the main author)
-	const authorsPromise = Promise.resolve({ allAuthors: [] });
+	useEffect (() => acceptServerState(state), [state, acceptServerState]);
 	
 	return (
 		<CollaborationProvider postId={state.post.id} userId={state.user?.id}>
@@ -32,7 +37,7 @@ export function BlocksSidebar (state: ServerState & { user: User }) {
 					post={post || state.post}
 					avatarUrl={state.avatarUrl}
 					tracker={tracker || state.tracker}
-					authorsPromise={authorsPromise}
+					authorsPromise={state.authorsPromise}
 					className={'mt-18'}
 					isEditMode={true}
 				/>

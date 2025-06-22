@@ -9,8 +9,7 @@ export async function getSiteConfiguration() {
   try {
     const config = await siteConfigService.getSiteConfig().toPromise();
     return { success: true, config };
-  } catch (error) {
-    console.error('Failed to get site configuration:', error);
+  } catch {
     return { success: false, error: 'Failed to get site configuration' };
   }
 }
@@ -35,8 +34,7 @@ export async function updateSiteConfiguration(data: Partial<SiteConfigData>) {
     const updatedConfig = await siteConfigService.updateSiteConfig(data).toPromise();
     
     return { success: true, config: updatedConfig };
-  } catch (error) {
-    console.error('Failed to update site configuration:', error);
+  } catch {
     return { success: false, error: 'Failed to update site configuration' };
   }
 }
@@ -47,17 +45,14 @@ export async function checkSiteConfigPermission() {
       headers: await headers(),
     });
 
-    // For development - mock admin user always has permission
     if (!session?.user?.id) {
-      return { success: true, hasPermission: true }; // Allow mock user
+      return { success: true, hasPermission: false };
     }
 
     const isAuthorized = await siteConfigService.isAuthorizedToModify(session.user.id).toPromise();
     
     return { success: true, hasPermission: isAuthorized };
-  } catch (error) {
-    console.error('Failed to check site config permission:', error);
-    // For development - fallback to allowing permission
-    return { success: true, hasPermission: true };
+  } catch {
+    return { success: false, hasPermission: false, error: 'Failed to check permissions' };
   }
 }

@@ -98,12 +98,12 @@ export const getBlocksBySlug = canReadPostCached(async (slug: string) => {
 	return contentService.getBlocksBySlug(slug).toResult();
 });
 
-export const getPostById = canReadPostCached(async (postId: string, includeUnpublished: boolean = false) => {
-	return postService.getPostById(postId, includeUnpublished).toResult();
+export const getPostById = canReadPostCached(async (postId: string, userId?: string) => {
+	return postService.getPostById(postId, userId).toResult();
 });
 
-export const getPostBySlug = canReadPostCached(async (slug: string, includeUnpublished: boolean = false) => {
-	return postService.getPostBySlug(slug, includeUnpublished).toResult();
+export const getPostBySlug = canReadPostCached(async (slug: string, userId?: string) => {
+	return postService.getPostBySlug(slug, userId).toResult();
 });
 
 export const getTrackerByPostId = canReadPostCached(async (postId: string) => {
@@ -145,6 +145,10 @@ export const publishPost = canPublishPostCached(async (postId: string, userId: s
 
 export const unpublishPost = canPublishPostCached(async (postId: string, userId: string) => {
 	return postService.unpublishPost(postId, userId).toResult();
+});
+
+export const schedulePost = canPublishPostCached(async (postId: string, scheduledAt: Date, userId: string) => {
+	return postService.schedulePost(postId, scheduledAt, userId).toResult();
 });
 
 export const getFormatedData = canReadFileCached(async (fileId: string) => {
@@ -266,8 +270,8 @@ export const getUserCollaborativePosts = cache(async (userId: string) => {
 });
 
 // Unauthenticated versions for public blog viewing
-export const getPostBySlugPublic = padCache(async (slug: string, includeUnpublished: boolean = false) => {
-	return postService.getPostBySlug(slug, includeUnpublished).toResult();
+export const getPostBySlugPublic = padCache(async (slug: string, userId?: string) => {
+	return postService.getPostBySlug(slug, userId).toResult();
 });
 
 export const getBlocksByPostIdPublic = padCache(async (postId: string) => {
@@ -302,5 +306,30 @@ export const isUserAuthor = canReadPostCached(async (postId: string, userId: str
 // Public versions for blog display
 export const getPostAuthorsPublic = padCache(async (postId: string) => {
 	return postCollaborationService.getPostAuthors(postId).toResult();
+});
+
+// Search and posts functionality
+export const searchPosts = padCache(async (query: string, options: {
+	includeUnpublished?: boolean;
+	limit?: number;
+	includeStats?: boolean;
+} = {}) => {
+	return postService.searchPosts(query, options).toResult();
+});
+
+export const getPublishedPosts = padCache(async (options: {
+	limit?: number;
+	includeStats?: boolean;
+	authorId?: string;
+} = {}) => {
+	return postService.getPublishedPostsList(options).toResult();
+});
+
+export const getUserPostsWithStats = canReadPostCached(async (userId: string, options: {
+	includeUnpublished?: boolean;
+	limit?: number;
+	offset?: number;
+} = {}) => {
+	return postService.getUserPostsWithStats(userId, options).toResult();
 });
 

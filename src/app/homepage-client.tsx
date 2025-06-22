@@ -4,27 +4,57 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Clock, User, TrendingUp, Star, ArrowRight, ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
-import { useState, useEffect } from "react";
+import { useState, useEffect, memo } from "react";
 import { HomepagePost } from "@/app/actions/homepage";
+import {useFileId} from "@/hooks/useFileId";
+import { NewsletterForm } from "@/components/newsletter-form";
 
 interface HomePageProps {
   featuredPosts: HomepagePost[];
   trendingPosts: HomepagePost[];
 }
 
-// Default placeholder image for posts without images
-const DEFAULT_POST_IMAGE = "https://images.unsplash.com/photo-1499750310107-5fef28a66643?w=800&q=80";
+// Component to handle excerpt image loading
+const ExcerptImage = memo<{ excerptImage: string | null; fallbackImage: string | null; alt: string }>(({ 
+	excerptImage, 
+	alt
+}) => {
+	const { url, loading } = useFileId(excerptImage || '')
+	
+	if (!url && !loading) {
+		return (
+			<div className="w-full h-full bg-muted flex items-center justify-center rounded-t-lg">
+				<span className="text-muted-foreground text-sm">No image available</span>
+			</div>
+		);
+	}
+	
+	return (
+		<img
+			src={url}
+			alt={alt}
+			className="object-cover rounded-t-lg"
+		/>
+	);
+});
 
-function SuggestedPost({ post }: { post: HomepagePost }) {
+ExcerptImage.displayName = 'ExcerptImage';
+
+const SuggestedPost = memo<{ post: HomepagePost }>(({ post }) => {
 	return (
 		<Link href={`/blogs/${post.slug}`} key={post.id}>
 			<Card className="h-full pt-0 hover:shadow-lg transition-shadow">
 				<div className="relative h-52 overflow-hidden">
-					<img
-						src={post.image || DEFAULT_POST_IMAGE}
-						alt={post.title}
-						className="object-cover rounded-t-lg"
+					<ExcerptImage 
+						excerptImage={post.excerptImage} 
+						fallbackImage={post.image} 
+						alt={post.title} 
 					/>
+					{post.isManualExcerpt && (
+						<Badge className="absolute top-2 right-2 bg-primary/90 text-primary-foreground">
+							Featured
+						</Badge>
+					)}
 				</div>
 				<CardHeader>
 					<div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
@@ -39,6 +69,11 @@ function SuggestedPost({ post }: { post: HomepagePost }) {
 						</div>
 					</div>
 					<CardTitle className="line-clamp-2">{post.title}</CardTitle>
+					{post.excerptByline && (
+						<p className="text-sm text-muted-foreground italic mb-2">
+							{post.excerptByline}
+						</p>
+					)}
 					<CardDescription className="line-clamp-2">
 						{post.excerpt}
 					</CardDescription>
@@ -54,8 +89,36 @@ function SuggestedPost({ post }: { post: HomepagePost }) {
 				</CardContent>
 			</Card>
 		</Link>
-	)
-}
+	);
+});
+
+SuggestedPost.displayName = 'SuggestedPost';
+
+// Component to handle hero carousel image
+const HeroImage = memo<{ post: HomepagePost }>(({ post }) => {
+	// Both excerptImage and post.image are URLs, not file IDs
+	const imageUrl = post.excerptImage || post.image;
+	
+	if (!imageUrl) {
+		return (
+			<div className="absolute inset-0 bg-muted flex items-center justify-center">
+				<span className="text-muted-foreground text-xl">No image available</span>
+			</div>
+		);
+	}
+	
+	return (
+		<div className="absolute inset-0">
+			<img
+				src={imageUrl}
+				alt={post.title}
+				className="object-cover brightness-50"
+			/>
+		</div>
+	);
+});
+
+HeroImage.displayName = 'HeroImage';
 
 export default function HomePage({ featuredPosts, trendingPosts }: HomePageProps) {
 	const [currentSlide, setCurrentSlide] = useState(0);
@@ -127,13 +190,7 @@ export default function HomePage({ featuredPosts, trendingPosts }: HomePageProps
 								index === currentSlide ? "opacity-100" : "opacity-0 pointer-events-none"
 							}`}
 						>
-							<div className="absolute inset-0">
-								<img
-									src={post.image || DEFAULT_POST_IMAGE}
-									alt={post.title}
-									className="object-cover brightness-50"
-								/>
-							</div>
+							<HeroImage post={post} />
 							<div className="absolute inset-0 bg-gradient-to-r from-background/80 via-background/20 to-transparent" />
 							<div className="relative h-full flex items-center text-primary">
 								<div className="w-[60%] pl-20 pr-12">
@@ -155,6 +212,11 @@ export default function HomePage({ featuredPosts, trendingPosts }: HomePageProps
 											<h1 className="text-5xl font-bold mb-4 hover:text-primary/80 transition-colors">
 												{post.title}
 											</h1>
+											{post.excerptByline && (
+												<p className="text-lg text-primary/80 italic mb-2">
+													{post.excerptByline}
+												</p>
+											)}
 											<p className="text-xl text-primary/90 mb-4 line-clamp-2">
 												{post.excerpt || 'Click to read more...'}
 											</p>
@@ -311,16 +373,11 @@ export default function HomePage({ featuredPosts, trendingPosts }: HomePageProps
 					<p className="text-muted-foreground mb-8">
 						Subscribe to our newsletter for the latest articles and updates
 					</p>
-					<div className="flex gap-4 max-w-md mx-auto">
-						<input
-							type="email"
-							placeholder="Enter your email"
-							className="flex-1 px-4 py-2 rounded-lg border bg-background"
-						/>
-						<button className="px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors">
-							Subscribe
-						</button>
-					</div>
+					<NewsletterForm 
+						source="homepage"
+						placeholder="Enter your email"
+						buttonText="Subscribe"
+					/>
 				</div>
 			</section>
 		</div>

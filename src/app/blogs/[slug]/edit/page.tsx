@@ -7,6 +7,7 @@ import { PostWithDetails } from '@/services/postService';
 import { UnifiedBlockOutput, ContentAnalysis } from '@/services/types';
 import { ProgressTracker } from '@/generated/prisma';
 import { preprocessBlocks } from '@/lib/preprocess-blocks';
+import { getAuthorsWithAvatars } from "@/lib/blog-authors";
 
 interface EditBlogPostProps {
     params: Promise<{
@@ -24,14 +25,24 @@ export default async function EditBlogPost({ params }: EditBlogPostProps) {
 		return redirect('/auth');
 	}
 	
-    const post = await unwrap(getPostBySlug(slug, true)) as PostWithDetails;
+    const post = await unwrap(getPostBySlug(slug, session.user.id)) as PostWithDetails;
     const rawBlocks = await unwrap(getBlocksByPostId(post.id)) as UnifiedBlockOutput[];
     const blocks = await preprocessBlocks(rawBlocks);
     const tracker = await unwrap(getTrackerByPostId(post.id)) as ProgressTracker | null;
     const analysis = await unwrap(getContentAnalysis(post.id)) as ContentAnalysis;
     const avatarUrl =  post.author.avatarFileId ? await unwrap(getPublicUrl(post.author.avatarFileId)) as string : post.author.image || null;
+    
+    const authorsPromise = getAuthorsWithAvatars(post.id);
 
     return (
-	    <BlocksSidebar post={post} blocks={blocks} tracker={tracker} avatarUrl={avatarUrl} analysis={analysis} user={session.user} />
+	    <BlocksSidebar
+			post={post}
+			blocks={blocks}
+			tracker={tracker}
+			avatarUrl={avatarUrl}
+			analysis={analysis}
+			user={session.user}
+			authorsPromise={authorsPromise}
+		/>
     )
 }

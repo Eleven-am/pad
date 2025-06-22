@@ -102,10 +102,10 @@ export class UpdatePostTagsCommand extends BaseCommand<PostWithDetails> {
 	}
 
 	async execute (): Promise<PostWithDetails> {
-		const post = await unwrap (getPostById (this.postId, true)) as PostWithDetails;
+		const post = await unwrap (getPostById (this.postId, this.userId)) as PostWithDetails;
 		this.previousTags = post.postTags.map (pt => pt.tagId);
 		await unwrap (updatePostTags (this.postId, this.tagIds, this.userId));
-		return await unwrap (getPostById (this.postId, true)) as PostWithDetails;
+		return await unwrap (getPostById (this.postId, this.userId)) as PostWithDetails;
 	}
 
 	async undo (): Promise<PostWithDetails> {

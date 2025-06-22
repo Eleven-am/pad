@@ -2,14 +2,23 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSessionCookie } from "better-auth/cookies";
 
 export const config = {
-	matcher: ["/dashboard2"], // Specify the routes the middleware applies to
+	matcher: [
+		"/dashboard",
+		"/profile", 
+		"/my-posts",
+		"/settings",
+		"/blogs/:path*/edit"
+	], // Protected routes that require authentication
 };
 
 export async function middleware(request: NextRequest) {
 	const sessionCookie = getSessionCookie(request);
 	
 	if (!sessionCookie) {
-		return NextResponse.redirect(new URL("/", request.url));
+		// Redirect to auth page with the intended destination
+		const authUrl = new URL("/auth", request.url);
+		authUrl.searchParams.set("redirect", request.nextUrl.pathname);
+		return NextResponse.redirect(authUrl);
 	}
 	
 	return NextResponse.next();

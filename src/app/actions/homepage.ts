@@ -1,13 +1,17 @@
 'use server';
 
-import { postService, dashboardService } from '@/services/di';
+import { postService, dashboardService, postExcerptService } from '@/services/di';
 import { PostWithDetails } from '@/services/postService';
+import { PostExcerpt } from '@/services/postExcerptService';
 import { hasError } from '@eleven-am/fp';
 
 export interface HomepagePost {
   id: string;
   title: string;
   excerpt: string | null;
+  excerptImage: string | null; // URL for the excerpt image (from PostExcerpt service)
+  excerptByline: string | null;
+  isManualExcerpt: boolean;
   author: {
     name: string | null;
     avatar: string | null;
@@ -16,23 +20,38 @@ export interface HomepagePost {
   tags: string[];
   readTime: string;
   date: string;
-  image: string | null;
+  image: string | null; // URL for the main post image
   slug: string;
 }
 
 /**
  * Transforms a PostWithDetails to HomepagePost format
  */
-function transformToHomepagePost(post: PostWithDetails): HomepagePost {
+async function transformToHomepagePost(post: PostWithDetails): Promise<HomepagePost> {
   // Calculate estimated read time (assuming 200 words per minute)
   const wordsPerMinute = 200;
   const wordCount = post.excerpt ? post.excerpt.split(' ').length * 10 : 500; // Rough estimate
   const readTime = Math.max(1, Math.ceil(wordCount / wordsPerMinute));
 
+  // Fetch enhanced excerpt data
+  let excerptData: PostExcerpt | null = null;
+  
+  try {
+    const excerptResult = await postExcerptService.getPostExcerpt(post.id).toResult();
+    if (!hasError(excerptResult)) {
+      excerptData = excerptResult.data;
+    }
+  } catch {
+    // Silently handle excerpt fetch errors - fallback to post excerpt
+  }
+
   return {
     id: post.id,
     title: post.title,
-    excerpt: post.excerpt,
+    excerpt: excerptData?.excerpt || post.excerpt || null,
+    excerptImage: excerptData?.imageUrl || null, // This is already a URL from the service
+    excerptByline: excerptData?.byline || null,
+    isManualExcerpt: excerptData?.isManualExcerpt || false,
     author: {
       name: post.author.name,
       avatar: post.author.image || null,
@@ -45,7 +64,7 @@ function transformToHomepagePost(post: PostWithDetails): HomepagePost {
       month: 'short',
       day: 'numeric',
     }) : '',
-    image: post.ogImage || null,
+    image: excerptData?.imageUrl || null, // Use the excerpt image as the main image
     slug: post.slug,
   };
 }
@@ -57,11 +76,15 @@ export async function getFeaturedPostsAction(limit: number = 5): Promise<Homepag
   const result = await postService.getFeaturedPosts(limit).toResult();
   
   if (hasError(result)) {
-    console.error('Failed to fetch featured posts:', result.error);
     return [];
   }
   
-  return result.data.map(transformToHomepagePost);
+  // Transform posts with enhanced excerpt data
+  const transformedPosts = await Promise.all(
+    result.data.map((post) => transformToHomepagePost(post))
+  );
+  
+  return transformedPosts;
 }
 
 /**
@@ -72,22 +95,26 @@ export async function getTrendingPostsAction(limit: number = 6): Promise<Homepag
   const topPostsResult = await dashboardService.getTopPosts(undefined, limit).toResult();
   
   if (hasError(topPostsResult)) {
-    console.error('Failed to fetch trending posts:', topPostsResult.error);
     return [];
   }
-  
-  // Fetch full post details for each top post
-  const posts: HomepagePost[] = [];
-  
-  for (const topPost of topPostsResult.data) {
-    const postResult = await postService.getPostById(topPost.id).toResult();
-    
-    if (!hasError(postResult)) {
-      posts.push(transformToHomepagePost(postResult.data));
-    }
+
+  const postIds = topPostsResult.data.map(p => p.id);
+  if (postIds.length === 0) return [];
+
+  // Fetch all post details in a single batch query
+  const postsResult = await postService.getPostsByIds(postIds).toResult();
+
+  if (hasError(postsResult)) {
+    return [];
   }
+
+  // Transform posts and maintain original sort order
+  const posts = await Promise.all(
+    postsResult.data.map(post => transformToHomepagePost(post))
+  );
   
-  return posts;
+  // Ensure original sort order is maintained based on trending ranking
+  return posts.sort((a, b) => postIds.indexOf(a.id) - postIds.indexOf(b.id));
 }
 
 /**
@@ -102,11 +129,15 @@ export async function getRecentPostsAction(limit: number = 6): Promise<HomepageP
   }).toResult();
   
   if (hasError(result)) {
-    console.error('Failed to fetch recent posts:', result.error);
     return [];
   }
   
-  return result.data.posts.map(transformToHomepagePost);
+  // Transform posts with enhanced excerpt data
+  const transformedPosts = await Promise.all(
+    result.data.posts.map(post => transformToHomepagePost(post))
+  );
+  
+  return transformedPosts;
 }
 
 /**

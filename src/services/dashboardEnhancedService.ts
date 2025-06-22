@@ -121,8 +121,8 @@ export class DashboardEnhancedService extends BaseService {
           where: { ...whereClause, published: true },
           select: {
             id: true,
-            metaTitle: true,
-            metaDescription: true,
+            title: true,
+            excerpt: true,
             focusKeyword: true,
             textBlocks: {
               select: {
@@ -134,7 +134,7 @@ export class DashboardEnhancedService extends BaseService {
 
         // Calculate SEO score based on metadata presence
         const postsWithSeo = posts.filter(p => 
-          p.metaTitle && p.metaDescription && p.focusKeyword
+          p.title && p.excerpt && p.focusKeyword
         );
         const postsWithSeoMetadata = posts.length > 0
           ? (postsWithSeo.length / posts.length) * 100
@@ -143,8 +143,8 @@ export class DashboardEnhancedService extends BaseService {
         // Simple SEO score calculation
         const seoScores = posts.map(post => {
           let score = 0;
-          if (post.metaTitle) score += 25;
-          if (post.metaDescription) score += 25;
+          if (post.title) score += 25;
+          if (post.excerpt) score += 25;
           if (post.focusKeyword) score += 25;
           // Check if content includes focus keyword
           const hasKeywordInContent = post.textBlocks.some(block =>

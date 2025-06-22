@@ -90,7 +90,7 @@ export abstract class BaseCommand<T = unknown> implements IBaseCommand {
 						title: data.title || undefined,
 						maxHeight: data.maxHeight,
 						startLine: data.startLine,
-						highlightLines: data.highlightLines
+						highlightLines: data.highlightLines as number[] | undefined
 					}
 				};
 			case BlockType.TABLE:
@@ -163,7 +163,7 @@ export abstract class BaseCommand<T = unknown> implements IBaseCommand {
 						valueKey: data.valueKey || undefined,
 						xAxis: data.xAxis,
 						yAxis: data.yAxis,
-						series: data.series || undefined,
+						series: (data.series as string[]) || undefined,
 						fileId: data.fileId
 					}
 				};

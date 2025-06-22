@@ -25,8 +25,6 @@ interface UpdatePostData {
 	categoryId?: string;
 	seriesId?: string;
 	seriesOrder?: number;
-	metaTitle?: string;
-	metaDescription?: string;
 	focusKeyword?: string;
 	published?: boolean;
 	scheduledAt: Date | null;
@@ -37,14 +35,14 @@ export interface CreatePostInput {
 	title: string;
 	slug?: string;
 	excerpt?: string;
+	excerptImageId?: string;
+	excerptByline?: string;
 	categoryId?: string;
 	seriesId?: string;
 	seriesOrder?: number;
 	tagIds?: string[];
 	
 	// SEO
-	metaTitle?: string;
-	metaDescription?: string;
 	focusKeyword?: string;
 	
 	// Publishing
@@ -57,14 +55,14 @@ export interface UpdatePostInput {
 	title?: string;
 	slug?: string;
 	excerpt?: string;
+	excerptImageId?: string;
+	excerptByline?: string;
 	categoryId?: string;
 	seriesId?: string;
 	seriesOrder?: number;
 	tagIds?: string[];
 	
 	// SEO
-	metaTitle?: string;
-	metaDescription?: string;
 	focusKeyword?: string;
 	
 	// Publishing
@@ -137,19 +135,48 @@ export class PostService extends BaseService {
 	/**
 	 * Gets post by ID with all details
 	 * @param id - The ID of the post
-	 * @param includeUnpublished - Whether to include unpublished posts
+	 * @param userId - Optional user ID to check if user has access to unpublished posts
 	 * @returns The post with details
 	 */
-	getPostById(id: string, includeUnpublished = false): TaskEither<PostWithDetails> {
+	getPostById(id: string, userId?: string): TaskEither<PostWithDetails> {
 		return TaskEither
 			.tryCatch(
-				() => this.prisma.post.findUnique({
-					where: {
-						id,
-						...(includeUnpublished ? {} : { published: true }),
-					},
-					include: this.getPostInclude(),
-				}),
+				() => {
+					if (userId) {
+						// If userId is provided, get post if user is author/collaborator OR post is published
+						return this.prisma.post.findFirst({
+							where: {
+								id,
+								OR: [
+									// Post is published and time has arrived
+									{
+										published: true,
+										publishedAt: { lte: new Date() }
+									},
+									// User is the author
+									{ authorId: userId },
+									// User is a collaborator
+									{
+										collaborators: {
+											some: { userId }
+										}
+									}
+								]
+							},
+							include: this.getPostInclude(),
+						});
+					} else {
+						// No userId provided, only return published posts
+						return this.prisma.post.findFirst({
+							where: {
+								id,
+								published: true,
+								publishedAt: { lte: new Date() }
+							},
+							include: this.getPostInclude(),
+						});
+					}
+				},
 				'Failed to fetch post by ID'
 			)
 			.nonNullable('Post not found')
@@ -159,19 +186,48 @@ export class PostService extends BaseService {
 	/**
 	 * Gets post by slug
 	 * @param slug - The slug of the post
-	 * @param includeUnpublished - Whether to include unpublished posts
+	 * @param userId - Optional user ID to check if user has access to unpublished posts
 	 * @returns The post with details
 	 */
-	getPostBySlug(slug: string, includeUnpublished = false) {
+	getPostBySlug(slug: string, userId?: string) {
 		return TaskEither
 			.tryCatch(
-				() => this.prisma.post.findUnique({
-					where: {
-						slug,
-						...(includeUnpublished ? {} : { published: true }),
-					},
-					include: this.getPostInclude(),
-				}),
+				() => {
+					if (userId) {
+						// If userId is provided, get post if user is author/collaborator OR post is published
+						return this.prisma.post.findFirst({
+							where: {
+								slug,
+								OR: [
+									// Post is published and time has arrived
+									{
+										published: true,
+										publishedAt: { lte: new Date() }
+									},
+									// User is the author
+									{ authorId: userId },
+									// User is a collaborator
+									{
+										collaborators: {
+											some: { userId }
+										}
+									}
+								]
+							},
+							include: this.getPostInclude(),
+						});
+					} else {
+						// No userId provided, only return published posts
+						return this.prisma.post.findFirst({
+							where: {
+								slug,
+								published: true,
+								publishedAt: { lte: new Date() }
+							},
+							include: this.getPostInclude(),
+						});
+					}
+				},
 				'Failed to fetch post by slug'
 			)
 			.nonNullable('Post not found')
@@ -192,7 +248,7 @@ export class PostService extends BaseService {
 			.chain((existingPost) => this.validateSlugIfProvided(input.slug, id).map(() => existingPost))
 			.chain((existingPost) => this.buildUpdateData(input, existingPost))
 			.chain((updateData) => this.performUpdate(id, updateData))
-			.chain(() => this.getPostById(id, true));
+			.chain(() => this.getPostById(id, userId));
 	}
 	
 	/**
@@ -243,17 +299,27 @@ export class PostService extends BaseService {
 	 * @param userId - The ID of the user scheduling the post
 	 * @returns The scheduled post with details
 	 */
-	schedulePost(id: string, scheduledAt: Date, userId: string): TaskEither<PostWithDetails> {
+	schedulePost(id: string, scheduledAt: Date, _userId: string): TaskEither<PostWithDetails> {
 		return TaskEither
 			.of(scheduledAt)
 			.filter(
 				(date) => date > new Date(),
 				() => createInternalError('Scheduled date must be in the future')
 			)
-			.chain(() => this.updatePost(id, {
-				published: false,
-				scheduledAt,
-			}, userId));
+			.chain(() => this.performTransactionTask((tx) =>
+				TaskEither.tryCatch(
+					() => tx.post.update({
+						where: { id },
+						data: {
+							published: true,
+							publishedAt: scheduledAt,
+							scheduledAt
+						},
+					}),
+					'Failed to schedule post'
+				)
+			))
+			.chain(() => this.getPostById(id, _userId));
 	}
 	
 	/**
@@ -317,7 +383,6 @@ export class PostService extends BaseService {
 		const where = {
 			authorId: userId,
 			published: false,
-			scheduledAt: null,
 		};
 		
 		return TaskEither.fromBind({
@@ -356,11 +421,12 @@ export class PostService extends BaseService {
 				() => this.prisma.post.findMany({
 					where: {
 						authorId: userId,
-						published: false,
-						scheduledAt: { gte: new Date() },
+						published: true,
+						publishedAt: { gt: new Date() }, // Posts scheduled for future
+						scheduledAt: { not: null },
 					},
 					include: this.getPostInclude(),
-					orderBy: { scheduledAt: 'asc' },
+					orderBy: { publishedAt: 'asc' },
 				}),
 				'Failed to fetch scheduled posts'
 			)
@@ -391,6 +457,64 @@ export class PostService extends BaseService {
 	}
 	
 	/**
+	 * Gets multiple posts by their IDs (for batch operations)
+	 * @param ids - Array of post IDs to fetch
+	 * @param userId - Optional user ID to check access for unpublished posts
+	 * @returns Array of posts with details
+	 */
+	getPostsByIds(ids: string[], userId?: string): TaskEither<PostWithDetails[]> {
+		if (ids.length === 0) {
+			return TaskEither.of([]);
+		}
+
+		return TaskEither
+			.tryCatch(
+				() => {
+					const baseWhere = {
+						id: { in: ids },
+					};
+
+					if (userId) {
+						// If userId is provided, get posts if user is author/collaborator OR post is published
+						return this.prisma.post.findMany({
+							where: {
+								...baseWhere,
+								OR: [
+									// Post is published and time has arrived
+									{
+										published: true,
+										publishedAt: { lte: new Date() }
+									},
+									// User is the author
+									{ authorId: userId },
+									// User is a collaborator
+									{
+										collaborators: {
+											some: { userId }
+										}
+									}
+								]
+							},
+							include: this.getPostInclude(),
+						});
+					} else {
+						// No userId provided, only return published posts
+						return this.prisma.post.findMany({
+							where: {
+								...baseWhere,
+								published: true,
+								publishedAt: { lte: new Date() }
+							},
+							include: this.getPostInclude(),
+						});
+					}
+				},
+				'Failed to fetch posts by IDs'
+			)
+			.map((posts) => posts.map(post => this.transformToPostWithDetails(post)));
+	}
+	
+	/**
 	 * Updates all tags for a post (replaces existing)
 	 * @param postId - The ID of the post
 	 * @param tagIds - The IDs of the tags to add
@@ -403,7 +527,7 @@ export class PostService extends BaseService {
 				this.deleteExistingTags(postId, tx)
 					.chain(() => this.addNewTags(postId, tagIds, tx))
 			))
-			.chain(() => this.getPostById(postId, true));
+			.chain(() => this.getPostById(postId, userId));
 	}
 	
 	/**
@@ -622,7 +746,7 @@ export class PostService extends BaseService {
 						.map(() => post)
 					)
 			)
-			.chain((post) => this.getPostById(post.id, true));
+			.chain((post) => this.getPostById(post.id, userId));
 	}
 	
 	/**
@@ -644,8 +768,6 @@ export class PostService extends BaseService {
 					publishedAt: input.published ? new Date() : null,
 					scheduledAt: input.scheduledAt,
 					featured: input.featured ?? false,
-					metaTitle: input.metaTitle,
-					metaDescription: input.metaDescription,
 					focusKeyword: input.focusKeyword,
 					categoryId: input.categoryId,
 					seriesId: input.seriesId,
@@ -749,12 +871,22 @@ export class PostService extends BaseService {
 			publishedAt: null as Date | null,
 		};
 		
+		// Handle immediate publishing
 		if (input.published !== undefined) {
 			if (input.published && !existingPost.published) {
+				// Publishing immediately - set publishedAt to now
 				updateData.publishedAt = new Date();
 			} else if (!input.published && existingPost.published) {
+				// Unpublishing - clear publishedAt
 				updateData.publishedAt = null;
 			}
+		}
+		
+		// Handle scheduled publishing
+		if (input.scheduledAt !== undefined && input.scheduledAt !== null) {
+			// When scheduling, set published to true and publishedAt to the scheduled date
+			updateData.published = true;
+			updateData.publishedAt = input.scheduledAt;
 		}
 		
 		return TaskEither.of(updateData);
@@ -1026,5 +1158,280 @@ export class PostService extends BaseService {
 			}),
 			'Failed to delete progress tracker'
 		).map(() => undefined);
+	}
+
+	/**
+	 * Search posts by query
+	 * @param query - The search query
+	 * @param options - Search options
+	 * @returns Array of matching posts
+	 */
+	searchPosts(query: string, options: {
+		includeUnpublished?: boolean;
+		limit?: number;
+		includeStats?: boolean;
+	} = {}): TaskEither<any[]> {
+		const { includeUnpublished = false, limit = 50, includeStats = false } = options;
+
+		return TaskEither.tryCatch(
+			() => this.prisma.post.findMany({
+				where: {
+					published: includeUnpublished ? undefined : true,
+					OR: query ? [
+						{ title: { contains: query } },
+						{ excerpt: { contains: query } },
+						{ postTags: { some: { tag: { name: { contains: query } } } } },
+						{ category: { name: { contains: query } } },
+						{ author: { name: { contains: query } } }
+					] : undefined
+				},
+				include: {
+					author: {
+						select: {
+							name: true,
+							image: true,
+							avatarFileId: true
+						}
+					},
+					category: {
+						select: {
+							name: true,
+							slug: true
+						}
+					},
+					postTags: {
+						include: {
+							tag: {
+								select: {
+									name: true,
+									slug: true
+								}
+							}
+						}
+					},
+					...(includeStats && {
+						_count: {
+							select: {
+								postReads: true,
+								postViews: true,
+								likes: true
+							}
+						}
+					})
+				},
+				orderBy: [
+					{ featured: 'desc' },
+					{ publishedAt: 'desc' },
+					{ createdAt: 'desc' }
+				],
+				take: limit
+			}),
+			'Failed to search posts'
+		).map(posts => posts.map(post => ({
+			id: post.id,
+			title: post.title,
+			excerpt: post.excerpt,
+			slug: post.slug,
+			author: {
+				name: post.author.name,
+				image: post.author.image
+			},
+			category: post.category,
+			tags: post.postTags.map(pt => pt.tag),
+			published: post.published,
+			publishedAt: post.publishedAt,
+			createdAt: post.createdAt,
+			...(includeStats && { _count: post._count })
+		})));
+	}
+
+	/**
+	 * Get published posts with stats for search/listing
+	 * @param options - Query options
+	 * @returns Array of published posts
+	 */
+	getPublishedPostsList(options: {
+		limit?: number;
+		includeStats?: boolean;
+		authorId?: string;
+	} = {}): TaskEither<any[]> {
+		const { limit = 100, includeStats = false, authorId } = options;
+
+		return TaskEither.tryCatch(
+			() => this.prisma.post.findMany({
+				where: {
+					published: true,
+					...(authorId && { authorId })
+				},
+				include: {
+					author: {
+						select: {
+							name: true,
+							image: true,
+							avatarFileId: true
+						}
+					},
+					category: {
+						select: {
+							name: true,
+							slug: true
+						}
+					},
+					postTags: {
+						include: {
+							tag: {
+								select: {
+									name: true,
+									slug: true
+								}
+							}
+						}
+					},
+					...(includeStats && {
+						_count: {
+							select: {
+								postReads: true,
+								postViews: true,
+								likes: true,
+								bookmarks: true
+							}
+						}
+					})
+				},
+				orderBy: [
+					{ featured: 'desc' },
+					{ publishedAt: 'desc' },
+					{ createdAt: 'desc' }
+				],
+				take: limit
+			}),
+			'Failed to get published posts'
+		).map(posts => posts.map(post => ({
+			id: post.id,
+			title: post.title,
+			excerpt: post.excerpt,
+			slug: post.slug,
+			author: {
+				name: post.author.name,
+				image: post.author.image
+			},
+			category: post.category,
+			tags: post.postTags.map(pt => pt.tag),
+			published: post.published,
+			publishedAt: post.publishedAt,
+			createdAt: post.createdAt,
+			featured: post.featured,
+			...(includeStats && { _count: post._count })
+		})));
+	}
+
+	/**
+	 * Get user's posts with stats for management
+	 * @param userId - The user's ID
+	 * @param options - Query options
+	 * @returns Array of user's posts with stats
+	 */
+	getUserPostsWithStats(userId: string, options: {
+		includeUnpublished?: boolean;
+		limit?: number;
+		offset?: number;
+	} = {}): TaskEither<any> {
+		const { includeUnpublished = true, limit = 20, offset = 0 } = options;
+
+		return TaskEither.tryCatch(
+			async () => {
+				const where = {
+					authorId: userId,
+					...(includeUnpublished ? {} : { published: true })
+				};
+
+				const [posts, totalCount] = await Promise.all([
+					this.prisma.post.findMany({
+						where,
+						include: {
+							category: {
+								select: {
+									name: true,
+									slug: true
+								}
+							},
+							postTags: {
+								include: {
+									tag: {
+										select: {
+											name: true,
+											slug: true
+										}
+									}
+								}
+							},
+							_count: {
+								select: {
+									postReads: true,
+									postViews: true,
+									likes: true,
+									bookmarks: true
+								}
+							}
+						},
+						orderBy: [
+							{ publishedAt: 'desc' },
+							{ createdAt: 'desc' }
+						],
+						take: limit,
+						skip: offset
+					}),
+					this.prisma.post.count({ where })
+				]);
+
+				// Calculate stats
+				const publishedCount = await this.prisma.post.count({
+					where: { authorId: userId, published: true }
+				});
+
+				const draftCount = await this.prisma.post.count({
+					where: { authorId: userId, published: false }
+				});
+
+				const totalViews = await this.prisma.postView.count({
+					where: { post: { authorId: userId } }
+				});
+
+				const totalLikes = await this.prisma.postLike.count({
+					where: { post: { authorId: userId } }
+				});
+
+				return {
+					posts: posts.map(post => ({
+						id: post.id,
+						title: post.title,
+						excerpt: post.excerpt,
+						slug: post.slug,
+						category: post.category,
+						tags: post.postTags.map(pt => pt.tag),
+						published: post.published,
+						publishedAt: post.publishedAt,
+						createdAt: post.createdAt,
+						updatedAt: post.updatedAt,
+						featured: post.featured,
+						_count: post._count
+					})),
+					pagination: {
+						total: totalCount,
+						limit,
+						offset,
+						hasMore: (offset + limit) < totalCount
+					},
+					stats: {
+						total: totalCount,
+						published: publishedCount,
+						drafts: draftCount,
+						totalViews,
+						totalLikes
+					}
+				};
+			},
+			'Failed to get user posts with stats'
+		);
 	}
 }

@@ -13,6 +13,7 @@ import { DashboardEnhancedService } from "@/services/dashboardEnhancedService";
 import { SiteConfigService } from "@/services/siteConfigService";
 import { PostExcerptService } from "@/services/postExcerptService";
 import { createEmailService } from "@/services/emailService";
+import { NewsletterService } from "@/services/newsletterService";
 
 const redis = new Redis({
 	host: getOrThrow('REDIS_HOST'),
@@ -51,3 +52,5 @@ export const dashboardEnhancedService = new DashboardEnhancedService(prisma);
 export const siteConfigService = new SiteConfigService(prisma);
 
 export const postExcerptService = new PostExcerptService(prisma);
+
+export const newsletterService = new NewsletterService(prisma, emailService);

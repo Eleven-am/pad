@@ -3,13 +3,14 @@
 import {Sheet, SheetContent, SheetTrigger} from '@/components/ui/sheet';
 import {Button} from '@/components/ui/button';
 import {BlocksPanel} from '@/components/panels/blocks-panel';
-import {QueuePanel} from '@/components/panels/queue-panel';
 import {CollaboratePanel} from '@/components/panels/collaborate-panel';
-import {useState} from 'react';
-import {List, Plus, Redo, Save, Settings, Undo, Users} from 'lucide-react';
+import {useState, useEffect} from 'react';
+import {Plus, Redo, Save, Settings, Undo, Users, Check} from 'lucide-react';
 import {useBlockPostActions, useBlockPostState} from '@/commands/CommandManager';
 import {User} from 'better-auth';
 import {ManagePost} from "@/components/sidebars/manage-post-sidebar";
+import {useMenu} from '@/components/menu';
+import Link from 'next/link';
 
 interface MenuBarProps {
 	postId: string;
@@ -23,8 +24,17 @@ export function MenuBar ({postId, user}: MenuBarProps) {
 		canRedo: state.canRedo,
 		post: state.post
 	}));
+	const { activePanel, closeAllPanels, resetBlockState } = useMenu();
 	
 	const [activeSheet, setActiveSheet] = useState<string | null> (null);
+	
+	// Sync menu context activePanel with sheet state - but only on initial mount
+	// to handle direct block clicks
+	useEffect(() => {
+		if (activePanel === 'blocks' && !activeSheet) {
+			setActiveSheet('blocks');
+		}
+	}, [activePanel]); // eslint-disable-line react-hooks/exhaustive-deps
 	
 	const handleSave = () => {
 		if (post) {
@@ -78,7 +88,14 @@ export function MenuBar ({postId, user}: MenuBarProps) {
 						
 						<Sheet
 							open={activeSheet === 'blocks'}
-							onOpenChange={(open) => setActiveSheet (open ? 'blocks' : null)}
+							onOpenChange={(open) => {
+								setActiveSheet(open ? 'blocks' : null);
+								// Reset activePanel and block state when sheet closes
+								if (!open) {
+									resetBlockState();
+									closeAllPanels();
+								}
+							}}
 						>
 							<SheetTrigger asChild>
 								<Button variant="ghost" size="sm" className="gap-2">
@@ -92,23 +109,13 @@ export function MenuBar ({postId, user}: MenuBarProps) {
 						</Sheet>
 						
 						<Sheet
-							open={activeSheet === 'stack'}
-							onOpenChange={(open) => setActiveSheet (open ? 'stack' : null)}
-						>
-							<SheetTrigger asChild>
-								<Button variant="ghost" size="sm" className="gap-2">
-									<List className="w-4 h-4"/>
-									Stack
-								</Button>
-							</SheetTrigger>
-							<SheetContent className="w-96" hideClose>
-								<QueuePanel postId={postId}/>
-							</SheetContent>
-						</Sheet>
-						
-						<Sheet
 							open={activeSheet === 'collaborate'}
-							onOpenChange={(open) => setActiveSheet (open ? 'collaborate' : null)}
+							onOpenChange={(open) => {
+								setActiveSheet(open ? 'collaborate' : null);
+								if (!open) {
+									closeAllPanels();
+								}
+							}}
 						>
 							<SheetTrigger asChild>
 								<Button variant="ghost" size="sm" className="gap-2">
@@ -125,7 +132,12 @@ export function MenuBar ({postId, user}: MenuBarProps) {
 						
 						<Sheet
 							open={activeSheet === 'post'}
-							onOpenChange={(open) => setActiveSheet (open ? 'post' : null)}
+							onOpenChange={(open) => {
+								setActiveSheet(open ? 'post' : null);
+								if (!open) {
+									closeAllPanels();
+								}
+							}}
 						>
 							<SheetTrigger asChild>
 								<Button variant="outline" size="sm" className="gap-2">
@@ -137,6 +149,15 @@ export function MenuBar ({postId, user}: MenuBarProps) {
 								<ManagePost user={user} />
 							</SheetContent>
 						</Sheet>
+						
+						<div className="w-px h-6 bg-border mx-2"/>
+						
+						<Link href={`/blogs/${post?.slug}`}>
+							<Button variant="default" size="sm" className="gap-2">
+								<Check className="w-4 h-4"/>
+								Done
+							</Button>
+						</Link>
 					</div>
 				</div>
 			</div>

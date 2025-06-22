@@ -19,6 +19,7 @@ import {Notifier} from '@eleven-am/notifier';
 import {PostWithDetails, UpdatePostInput} from "@/services/postService";
 import {getBlocksByPostId, getCategories, getContentAnalysis, getPostById, getTags} from "@/lib/data";
 import {PublishPostCommand} from "./PublishPostCommand";
+import {SchedulePostCommand} from "./SchedulePostCommand";
 import {Category, ProgressTracker as Tracker, Tag} from "@/generated/prisma";
 import {CreateCategoryCommand, DeleteCategoryCommand, UpdateCategoryCommand} from "./CategoryCommands";
 import {CreateTagCommand, DeleteTagCommand, UpdatePostTagsCommand, UpdateTagCommand} from "./TagCommands";
@@ -191,6 +192,13 @@ class CommandManager extends Notifier<CommandState> {
 		);
 	}
 	
+	async schedulePost (postId: string, scheduledAt: Date, userId: string): Promise<void> {
+		await this.executeCommand (
+			() => new SchedulePostCommand ({postId, scheduledAt, userId, previousState: this.state.post!}),
+			this.handlePostResult
+		);
+	}
+	
 	async createCategory (data: CategoryData): Promise<Category | null> {
 		return await this.executeCommand (
 			() => new CreateCategoryCommand (data),
@@ -283,7 +291,7 @@ class CommandManager extends Notifier<CommandState> {
 		return this.currentIndex < this.commands.length - 1;
 	}
 	
-	async loadPost (postId: string, includeUnpublished = false, block?: UnifiedBlockOutput): Promise<void> {
+	async loadPost (postId: string, userId?: string, block?: UnifiedBlockOutput): Promise<void> {
 		if (this.state.post?.id === postId && ! block) {
 			return;
 		}
@@ -294,7 +302,7 @@ class CommandManager extends Notifier<CommandState> {
 			blocks
 		})
 		
-		const post = await unwrap (getPostById (postId, includeUnpublished)) as PostWithDetails;
+		const post = await unwrap (getPostById (postId, userId)) as PostWithDetails;
 		await this.managePostDetail (post);
 	}
 	
@@ -448,9 +456,22 @@ class CommandManager extends Notifier<CommandState> {
 			updateIndex ();
 			const result = operation === 'undo' ? await command.undo () : await command.redo ();
 			
-			// Only update blocks if the result is a UnifiedBlockOutput
-			if (result && typeof result === 'object' && 'type' in result && 'data' in result) {
-				this.updateBlocks (result as UnifiedBlockOutput);
+			// Handle different types of results
+			if (result) {
+				// Check if it's an array of blocks (from MoveBlocksCommand)
+				if (Array.isArray(result) && result.length > 0 && 'type' in result[0] && 'data' in result[0]) {
+					this.updateState({
+						blocks: (result as UnifiedBlockOutput[]).sort((a, b) => a.data.position - b.data.position)
+					});
+				}
+				// Check if it's a single block
+				else if (typeof result === 'object' && 'type' in result && 'data' in result) {
+					this.updateBlocks(result as UnifiedBlockOutput);
+				}
+				// Check if it's a post (from post-related commands)
+				else if (typeof result === 'object' && 'id' in result && 'title' in result) {
+					this.updateState({ post: result as PostWithDetails });
+				}
 			}
 		} catch (e) {
 			this.updateState ({error: String (e)});

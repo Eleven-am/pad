@@ -10,8 +10,34 @@ export const auth = betterAuth({
 	baseURL: process.env.NEXT_PUBLIC_BASE_URL,
 	secret: process.env.SECRET,
 	database: prismaAdapter(new PrismaClient(), {
-		provider: 'postgresql',
+		provider: 'sqlite',
 	}),
+	
+	databaseHooks: {
+		user: {
+			create: {
+				after: async (user) => {
+					// Check if this is the first user and promote to admin
+					const prisma = new PrismaClient();
+					try {
+						const userCount = await prisma.user.count();
+						if (userCount === 1) {
+							// This is the first user, promote to ADMIN
+							await prisma.user.update({
+								where: { id: user.id },
+								data: { role: 'ADMIN' }
+							});
+							// First user promoted to ADMIN role
+						}
+					} catch {
+						// Error checking/promoting first user - continue silently
+					} finally {
+						await prisma.$disconnect();
+					}
+				},
+			},
+		},
+	},
 	
 	socialProviders: {
 		google: {
