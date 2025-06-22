@@ -1,10 +1,8 @@
 import * as path from 'path';
-import { randomUUID } from 'crypto';
-import { writeFile, mkdir, unlink, access, readFile } from 'fs/promises';
-import { constants, createReadStream } from 'fs';
+import { randomUUID, createHmac } from 'crypto';
+import { writeFile, mkdir, unlink, readFile } from 'fs/promises';
 import { File as FileModel, PrismaClient } from '@/generated/prisma';
-import {TaskEither, Either, createUnauthorizedError, createNotFoundError, Http, createBadRequestError} from '@eleven-am/fp';
-import { z } from 'zod';
+import {TaskEither, createUnauthorizedError, createBadRequestError, Http} from '@eleven-am/fp';
 
 export interface StorageUsage {
 	totalFiles: number;
@@ -50,16 +48,42 @@ export class MediaService {
 	/**
 	 * Uploads a file to the server and stores metadata in the database
 	 *
-	 * @param file - Express multer file object
+	 * @param file - File object from FormData
 	 * @param uploaderId - ID of the user uploading the file
 	 * @returns Promise resolving to saved FileModel
 	 * @throws Error if file type is not allowed or quota exceeded
 	 */
-	uploadFile (file: Express.Multer.File, uploaderId: string): TaskEither<FileModel> {
+	uploadFile (file: File, uploaderId: string): TaskEither<FileModel> {
 		return this.checkUserQuota(uploaderId, file.size)
-			.chain(() => this.validateFileType(file.mimetype))
+			.filter(
+				() => this.ALLOWED_TYPES.includes(file.type),
+				() => createBadRequestError('File type not allowed')
+			)
+			.filter(
+				() => file.size <= this.MAX_FILE_SIZE,
+				() => createBadRequestError('File size exceeds maximum limit')
+			)
 			.chain(() => this.saveFileToDisk(file))
 			.chain(savedPath => this.saveFileMetadata(file, savedPath, uploaderId));
+	}
+	
+	/**
+	 * Downloads a file from a URL and uploads it
+	 *
+	 * @param url - URL to download from
+	 * @param userId - ID of the user downloading the file
+	 * @returns Promise resolving to saved FileModel
+	 */
+	downloadFromUrl (url: string, userId: string): TaskEither<FileModel> {
+		return Http.create(url)
+			.blob()
+			.getTask()
+			.map((blob) => new File([blob],
+				this.generateNameForBlob(blob), {
+				type: blob.type,
+				lastModified: Date.now(),
+			}))
+			.chain((file) => this.uploadFile(file, userId));
 	}
 	
 	/**
@@ -76,6 +100,24 @@ export class MediaService {
 				'Failed to get file'
 			)
 			.nonNullable('File not found');
+	}
+	
+	/**
+	 * Gets file content as a buffer along with metadata
+	 *
+	 * @param fileId - ID of the file to retrieve
+	 * @returns Promise resolving to file metadata and buffer
+	 * @throws Error if file not found or cannot read file
+	 */
+	getFileBuffer(fileId: string): TaskEither<{ file: FileModel; buffer: Buffer }> {
+		return this.getFile(fileId)
+			.chain(file => 
+				TaskEither.tryCatch(
+					() => readFile(file.path),
+					'Failed to read file'
+				)
+				.map(buffer => ({ file, buffer }))
+			);
 	}
 	
 	/**
@@ -108,7 +150,10 @@ export class MediaService {
 	 */
 	deleteFile(fileId: string, userId: string): TaskEither<FileModel> {
 		return this.getFile(fileId)
-			.chain(file => this.checkFileOwnership(file, userId))
+			.filter(
+				(file) => file.uploaderId === userId,
+				() => createUnauthorizedError('You do not have permission to delete this file')
+			)
 			.chain(file => this.deleteFileFromDisk(file))
 			.chain(file => this.deleteFileMetadata(file));
 	}
@@ -173,14 +218,14 @@ export class MediaService {
 			)
 			.chain(existingUrl => {
 				if (existingUrl) {
-					return TaskEither.success(existingUrl.url);
+					return TaskEither.of(existingUrl.url);
 				}
 				
 				// Generate new signed URL
 				return this.getFile(fileId)
 					.map(file => {
-						const timestamp = Date.now();
-						const signedUrl = this.generateSignedUrl(file, timestamp);
+						const expiryTimestamp = expiresAt.getTime();
+						const signedUrl = this.generateSignedUrl(file, expiryTimestamp);
 						
 						// Save to database
 						void this.prisma.signedUrl.create({
@@ -295,7 +340,8 @@ export class MediaService {
 					where: { fileId }
 				}),
 				'Failed to get file access stats'
-			);
+			)
+			.nonNullable('File access stats not found');
 
 		const getUsageInfo = TaskEither
 			.tryCatch(
@@ -316,36 +362,32 @@ export class MediaService {
 			.nonNullable('File not found');
 
 		return TaskEither
-			.all([getAccessStats, getUsageInfo])
-			.map(([accessStats, file]) => {
-				const usedInBlocks: string[] = [];
-				
-				if (file.tableBlocks.length > 0) {
-					usedInBlocks.push(...file.tableBlocks.map(() => 'table'));
-				}
-				if (file.videoFiles.length > 0) {
-					usedInBlocks.push(...file.videoFiles.map(() => 'video'));
-				}
-				if (file.posterFiles.length > 0) {
-					usedInBlocks.push(...file.posterFiles.map(() => 'video-poster'));
-				}
-				if (file.galleryImages.length > 0) {
-					usedInBlocks.push(...file.galleryImages.map(() => 'gallery'));
-				}
-				if (file.twitterImageFiles.length > 0) {
-					usedInBlocks.push(...file.twitterImageFiles.map(() => 'twitter'));
-				}
-				if (file.instagramFiles.length > 0) {
-					usedInBlocks.push(...file.instagramFiles.map(() => 'instagram'));
-				}
-				
-				const usedInPosts = file.postAudio.length;
-				
+			.fromBind({
+				accessStats: getAccessStats,
+				fileInfo: getUsageInfo,
+			})
+			.map(({ accessStats, fileInfo }) => {
+				const usedInPosts = fileInfo.tableBlocks.length +
+					fileInfo.videoFiles.length +
+					fileInfo.posterFiles.length +
+					fileInfo.galleryImages.length +
+					fileInfo.twitterImageFiles.length +
+					fileInfo.instagramFiles.length +
+					fileInfo.postAudio.length;
+
 				return {
-					totalAccess: accessStats?.totalAccess || 0,
-					lastAccessed: accessStats?.lastAccessedAt || null,
+					totalAccess: accessStats.totalAccess,
+					lastAccessed: accessStats.lastAccessedAt,
 					usedInPosts,
-					usedInBlocks,
+					usedInBlocks: [
+						...fileInfo.tableBlocks.map(block => block.id),
+						...fileInfo.videoFiles.map(video => video.id),
+						...fileInfo.posterFiles.map(poster => poster.id),
+						...fileInfo.galleryImages.map(image => image.id),
+						...fileInfo.twitterImageFiles.map(twitterImage => twitterImage.id),
+						...fileInfo.instagramFiles.map(instagramFile => instagramFile.id),
+						...fileInfo.postAudio.map(audio => audio.id),
+					],
 				};
 			});
 	}
@@ -392,35 +434,30 @@ export class MediaService {
 	
 	private checkUserQuota(userId: string, fileSize: number): TaskEither<void> {
 		return this.getUserStorageUsage(userId)
-			.chain(usage => {
-				if (usage.totalSize + fileSize > this.USER_QUOTA) {
-					return TaskEither.fail(createBadRequestError('User quota exceeded'));
-				}
-				return TaskEither.success(undefined);
-			});
+			.filter(
+				usage => usage.totalSize + fileSize <= this.USER_QUOTA,
+				() => createBadRequestError('User quota exceeded')
+			)
+			.map(() => undefined);
 	}
-	
-	private validateFileType(mimeType: string): TaskEither<void> {
-		if (!this.ALLOWED_TYPES.includes(mimeType)) {
-			return TaskEither.fail(createBadRequestError(`File type ${mimeType} not allowed`));
-		}
-		return TaskEither.success(undefined);
-	}
-	
-	private saveFileToDisk(file: Express.Multer.File): TaskEither<string> {
-		const filename = `${randomUUID()}-${file.originalname}`;
+
+	private saveFileToDisk(file: File): TaskEither<string> {
+		const filename = `${randomUUID()}-${file.name}`;
 		const filePath = path.join(this.uploadsPath, filename);
 		
 		return TaskEither
 			.tryCatch(
-				() => writeFile(filePath, file.buffer),
+				async () => {
+					const buffer = Buffer.from(await file.arrayBuffer());
+					await writeFile(filePath, buffer as any);
+				},
 				'Failed to save file to disk'
 			)
 			.map(() => filePath);
 	}
 	
 	private saveFileMetadata(
-		file: Express.Multer.File,
+		file: File,
 		savedPath: string,
 		uploaderId: string
 	): TaskEither<FileModel> {
@@ -429,20 +466,13 @@ export class MediaService {
 				data: {
 					filename: path.basename(savedPath),
 					path: savedPath,
-					mimeType: file.mimetype,
+					mimeType: file.type,
 					size: file.size,
 					uploaderId,
 				},
 			}),
 			'Failed to save file metadata'
 		);
-	}
-	
-	private checkFileOwnership(file: FileModel, userId: string): TaskEither<FileModel> {
-		if (file.uploaderId !== userId) {
-			return TaskEither.fail(createUnauthorizedError('You do not have permission to delete this file'));
-		}
-		return TaskEither.success(file);
 	}
 	
 	private deleteFileFromDisk(file: FileModel): TaskEither<FileModel> {
@@ -466,9 +496,73 @@ export class MediaService {
 	}
 	
 	private generateSignedUrl(file: FileModel, timestamp: number): string {
-		// Simple signed URL generation - in production, use a proper signing mechanism
+		// Generate secure token with embedded fileId and expiry
+		const secret = process.env.FILE_ACCESS_SECRET || 'default-secret-change-in-production';
+		const token = this.generateSecureToken(file.id, timestamp, secret);
 		const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
-		return `${baseUrl}/api/files/${file.id}?t=${timestamp}`;
+		return `${baseUrl}/api/files/${file.id}?token=${token}`;
+	}
+	
+	/**
+	 * Generates a cryptographically secure token for file access
+	 */
+	private generateSecureToken(fileId: string, expiresAt: number, secret: string): string {
+		// Create payload with fileId and expiry
+		const payload = `${fileId}:${expiresAt}`;
+		
+		// Generate HMAC signature
+		const hmac = createHmac('sha256', secret);
+		hmac.update(payload);
+		const signature = hmac.digest('hex');
+		
+		// Encode payload and signature as base64url
+		const encodedPayload = Buffer.from(payload).toString('base64url');
+		const token = `${encodedPayload}.${signature}`;
+		
+		return token;
+	}
+	
+	/**
+	 * Validates a secure token and returns the fileId if valid
+	 */
+	static validateSecureToken(token: string, secret: string): { valid: boolean; fileId?: string; expired?: boolean } {
+		try {
+			const [encodedPayload, signature] = token.split('.');
+			if (!encodedPayload || !signature) {
+				return { valid: false };
+			}
+			
+			// Decode payload
+			const payload = Buffer.from(encodedPayload, 'base64url').toString();
+			const [fileId, expiresAtStr] = payload.split(':');
+			const expiresAt = parseInt(expiresAtStr, 10);
+			
+			// Verify signature
+			const hmac = createHmac('sha256', secret);
+			hmac.update(payload);
+			const expectedSignature = hmac.digest('hex');
+			
+			if (signature !== expectedSignature) {
+				return { valid: false };
+			}
+			
+			// Check expiry
+			if (Date.now() > expiresAt) {
+				return { valid: false, expired: true };
+			}
+			
+			return { valid: true, fileId };
+		} catch {
+			return { valid: false };
+		}
+	}
+	
+	/**
+	 * Generates a filename for a blob based on its type
+	 */
+	private generateNameForBlob(blob: Blob): string {
+		const extension = blob.type.split('/')[1] || 'bin';
+		return `download-${randomUUID()}.${extension}`;
 	}
 	
 	/**

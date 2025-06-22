@@ -2,8 +2,6 @@ import {NextResponse} from "next/server";
 import {auth} from "@/lib/better-auth/server";
 import {headers} from "next/headers";
 import {mediaService} from "@/services/di";
-import { NextRequest } from 'next/server';
-import {hasError} from "@eleven-am/fp";
 
 export async function POST(req: Request) {
 	try {
@@ -24,55 +22,4 @@ export async function POST(req: Request) {
 	}
 }
 
-export async function GET(request: NextRequest) {
-	try {
-		const token = request.nextUrl.searchParams.get('token');
-		
-		if (!token) {
-			return NextResponse.json(
-				{ error: 'Missing access token' },
-				{ status: 400 }
-			);
-		}
-
-		const fileStreamResult = await mediaService.getFileByToken(token).toResult();
-		
-		if (hasError(fileStreamResult)) {
-			const error = fileStreamResult.error;
-			return NextResponse.json(
-				{ error: error.message },
-				{ status: fileStreamResult.code || 500 }
-			);
-		}
-
-		const { file, stream } = fileStreamResult.data;
-
-		const headers = new Headers();
-		headers.set('Content-Type', file.mimeType);
-		headers.set('Content-Disposition', `inline; filename="${file.filename}"`);
-		headers.set('Cache-Control', 'public, max-age=31536000');
-
-		const readableStream = new ReadableStream({
-			start(controller) {
-				stream.on('data', (chunk: Buffer) => {
-					controller.enqueue(chunk);
-				});
-				stream.on('end', () => {
-					controller.close();
-				});
-				stream.on('error', (err: Error) => {
-					controller.error(err);
-				});
-			},
-		});
-
-		return new NextResponse(readableStream, {
-			headers,
-		});
-	} catch {
-		return NextResponse.json(
-			{ error: 'Internal server error' },
-			{ status: 500 }
-		);
-	}
-}
+// Remove the GET method since files are now served directly via /api/files/[fileId]

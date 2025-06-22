@@ -18,8 +18,8 @@ const prisma = new PrismaClient();
 
 export const mediaService = new MediaService(
 	prisma,
-	getOrDefault('MEDIA_BASE_PATH', './uploads'),
-	parseInt(getOrDefault('MEDIA_MAX_SIZE', '3600'), 10), // 1 hour default TTL for signed URLs
+	getOrDefault('MEDIA_BASE_PATH') || './uploads',
+	parseInt(getOrDefault('MEDIA_SIGNED_URL_TTL') || '3600', 10), // 1 hour default TTL for signed URLs
 );
 
 export const tableService = new TableService(prisma, mediaService);
