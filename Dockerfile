@@ -1,132 +1,59 @@
-# Multi-stage Dockerfile optimized for Next.js 15 with Prisma
-# Supports both AMD64 and ARM64 architectures
+# syntax=docker.io/docker/dockerfile:1
 
-# Stage 1: Base image with Node.js
 FROM node:20-alpine AS base
 
-# Install dependencies for all architectures
+# Install dependencies only when needed
+FROM base AS deps
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
-# Copy package files
+# Install dependencies based on the preferred package manager
 COPY package.json package-lock.json* ./
-
-# Stage 2: Install dependencies
-FROM base AS deps
-
-# Install ALL dependencies (including dev) for the build stage
 RUN \
   if [ -f package-lock.json ]; then npm ci; \
   else echo "Lockfile not found." && exit 1; \
   fi
 
-# Stage 3: Production dependencies only
-FROM base AS prod-deps
-
-# Install only production dependencies
-RUN \
-  if [ -f package-lock.json ]; then npm ci --omit=dev; \
-  else echo "Lockfile not found." && exit 1; \
-  fi
-
-# Stage 4: Build the application
+# Rebuild the source code only when needed
 FROM base AS builder
 WORKDIR /app
-
-# Copy ALL dependencies from deps stage (including dev deps for build)
 COPY --from=deps /app/node_modules ./node_modules
-
-# Copy source code
 COPY . .
 
 # Generate Prisma client
 RUN npx prisma generate
 
-# Build the application
 # Next.js collects telemetry data, disable it in production
 ENV NEXT_TELEMETRY_DISABLED=1
-# Set dummy values for build time to prevent errors
-ENV BETTER_AUTH_SECRET=build-time-secret
-ENV NEXT_PUBLIC_BASE_URL=http://localhost:3000
-ENV DATABASE_URL=file:./database.db
 RUN npm run build
 
-# Stage 5: Production image
-FROM node:20-alpine AS runner
+# Production image, copy all the files and run next
+FROM base AS runner
 WORKDIR /app
 
-# Set production environment
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# Create non-root user for security
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nextjs
+RUN addgroup -g 1001 -S nodejs
+RUN adduser -S nextjs -u 1001
 
-# Copy built application
 COPY --from=builder /app/public ./public
 
-# Set permissions for prerendered cache
-RUN mkdir .next
-RUN chown nextjs:nodejs .next
-
-# Copy built application with proper permissions
+# Automatically leverage output traces to reduce image size
+# https://nextjs.org/docs/advanced-features/output-file-tracing
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
-# Copy production dependencies
-COPY --from=prod-deps --chown=nextjs:nodejs /app/node_modules ./node_modules
-
-# Copy Prisma client and schema
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/.prisma ./node_modules/.prisma
-COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
-
-# Copy database initialization script
+# Copy entrypoint script and dependencies for init container
+COPY --from=builder --chown=nextjs:nodejs /app/docker-entrypoint.sh ./docker-entrypoint.sh
 COPY --from=builder --chown=nextjs:nodejs /app/scripts/db-init.js ./scripts/db-init.js
+COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
 COPY --from=builder --chown=nextjs:nodejs /app/src/generated/prisma ./src/generated/prisma
 
-# Create entrypoint script and set permissions
-RUN echo '#!/bin/sh\n\
-set -e\n\
-echo "🔧 Initializing Pad..."\n\
-echo "1️⃣ Generating Prisma Client..."\n\
-npx prisma generate\n\
-echo "2️⃣ Ensuring database schema is up to date..."\n\
-npx prisma db push --skip-generate\n\
-echo "3️⃣ Initializing database..."\n\
-node scripts/db-init.js\n\
-echo "4️⃣ Starting server..."\n\
-exec node server.js' > /app/docker-entrypoint.sh && \
-    chmod +x /app/docker-entrypoint.sh && \
-    chown nextjs:nodejs /app/docker-entrypoint.sh
-
-# Set build-time arguments (populated by GitHub Actions)
-ARG BUILDTIME
-ARG VERSION
-ARG REVISION
-
-# Add metadata labels
-LABEL org.opencontainers.image.title="Pad"
-LABEL org.opencontainers.image.description="Professional-grade, block-based content management and blogging platform"
-LABEL org.opencontainers.image.created="${BUILDTIME}"
-LABEL org.opencontainers.image.version="${VERSION}"
-LABEL org.opencontainers.image.revision="${REVISION}"
-LABEL org.opencontainers.image.vendor="Roy OSSAI"
-LABEL org.opencontainers.image.licenses="GPL-3.0"
-
-# Switch to non-root user
 USER nextjs
 
-# Expose port
 EXPOSE 3000
-
-# Set hostname to localhost
-ENV HOSTNAME="0.0.0.0"
 ENV PORT=3000
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:3000/api/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })" || exit 1
-
-# Start the application with database initialization
-CMD ["/app/docker-entrypoint.sh"]
+# Use entrypoint for init container, otherwise just run server
+CMD HOSTNAME="0.0.0.0" node docker-entrypoint.sh
