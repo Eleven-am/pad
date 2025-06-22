@@ -14,17 +14,26 @@ COPY package.json package-lock.json* ./
 # Stage 2: Install dependencies
 FROM base AS deps
 
-# Install dependencies based on the preferred package manager
+# Install ALL dependencies (including dev) for the build stage
+RUN \
+  if [ -f package-lock.json ]; then npm ci; \
+  else echo "Lockfile not found." && exit 1; \
+  fi
+
+# Stage 3: Production dependencies only
+FROM base AS prod-deps
+
+# Install only production dependencies
 RUN \
   if [ -f package-lock.json ]; then npm ci --omit=dev; \
   else echo "Lockfile not found." && exit 1; \
   fi
 
-# Stage 3: Build the application
+# Stage 4: Build the application
 FROM base AS builder
 WORKDIR /app
 
-# Copy dependencies from deps stage
+# Copy ALL dependencies from deps stage (including dev deps for build)
 COPY --from=deps /app/node_modules ./node_modules
 
 # Copy source code
@@ -38,7 +47,7 @@ RUN npx prisma generate
 ENV NEXT_TELEMETRY_DISABLED 1
 RUN npm run build
 
-# Stage 4: Production image
+# Stage 5: Production image
 FROM node:20-alpine AS runner
 WORKDIR /app
 
@@ -60,6 +69,9 @@ RUN chown nextjs:nodejs .next
 # Copy built application with proper permissions
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+
+# Copy production dependencies
+COPY --from=prod-deps --chown=nextjs:nodejs /app/node_modules ./node_modules
 
 # Copy Prisma client and schema
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/.prisma ./node_modules/.prisma
