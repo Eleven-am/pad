@@ -51,12 +51,58 @@ export class SiteConfigService extends BaseService {
 	 * Gets the current site configuration, creating default if none exists
 	 */
 	getSiteConfig (): TaskEither<SiteConfig> {
+		// During build time, return a default config if database is not available
+		if (process.env.NODE_ENV === 'production' && !process.env.DATABASE_URL) {
+			return TaskEither.of(this.getDefaultConfig());
+		}
+		
 		return TaskEither
 			.tryCatch(
 				() => this.prisma.siteConfig.findFirst (),
 			)
 			.nonNullable('Site configuration not found')
-			.orElse(() => this.createDefaultSiteConfig ());
+			.orElse(() => this.createDefaultSiteConfig ())
+			.orElse(() => TaskEither.of(this.getDefaultConfig()));
+	}
+	
+	/**
+	 * Returns a default configuration for build time
+	 */
+	private getDefaultConfig(): SiteConfig {
+		return {
+			id: 'default',
+			siteName: 'Pad',
+			siteDescription: 'A professional-grade, block-based content management and blogging platform',
+			siteTagline: 'Create. Publish. Analyze.',
+			logoFileId: null,
+			faviconFileId: null,
+			twitterUrl: null,
+			githubUrl: null,
+			linkedinUrl: null,
+			facebookUrl: null,
+			instagramUrl: null,
+			seoKeywords: null,
+			googleAnalytics: null,
+			gtmId: null,
+			footerLinks: JSON.stringify([
+				{ label: "Privacy Policy", href: "/privacy" },
+				{ label: "Terms of Service", href: "/terms" },
+			]),
+			navLinks: JSON.stringify([
+				{ label: "Dashboard", href: "/dashboard" },
+				{ label: "Archives", href: "/archives" },
+				{ label: "Categories", href: "/categories" },
+				{ label: "Profile", href: "/profile" },
+				{ label: "Settings", href: "/settings" },
+			]),
+			contactEmail: null,
+			adminEmail: null,
+			allowComments: true,
+			allowRegistration: true,
+			enableAnalytics: false,
+			createdAt: new Date(),
+			updatedAt: new Date(),
+		};
 	}
 	
 	/**

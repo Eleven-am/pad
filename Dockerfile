@@ -45,6 +45,10 @@ RUN npx prisma generate
 # Build the application
 # Next.js collects telemetry data, disable it in production
 ENV NEXT_TELEMETRY_DISABLED 1
+# Set dummy values for build time to prevent errors
+ENV BETTER_AUTH_SECRET=build-time-secret
+ENV NEXT_PUBLIC_BASE_URL=http://localhost:3000
+ENV DATABASE_URL=file:./database.db
 RUN npm run build
 
 # Stage 5: Production image

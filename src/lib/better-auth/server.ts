@@ -6,9 +6,9 @@ import { ac, ADMIN, EDITOR, AUTHOR, READER } from "./serverPermissions";
 import { PrismaClient } from "@/generated/prisma";
 
 export const auth = betterAuth({
-	appName: process.env.APP_NAME,
-	baseURL: process.env.NEXT_PUBLIC_BASE_URL,
-	secret: process.env.SECRET,
+	appName: process.env.APP_NAME || 'Pad',
+	baseURL: process.env.NEXT_PUBLIC_BASE_URL || process.env.BETTER_AUTH_URL,
+	secret: process.env.BETTER_AUTH_SECRET || process.env.SECRET || 'default-secret-change-in-production',
 	database: prismaAdapter(new PrismaClient(), {
 		provider: 'sqlite',
 	}),
@@ -116,7 +116,7 @@ export const auth = betterAuth({
 	
 	advanced: {
 		crossSubDomainCookies: {
-			enabled: true,
+			enabled: !!process.env.NEXT_PUBLIC_BASE_URL || !!process.env.BETTER_AUTH_URL,
 		},
 		useSecureCookies: process.env.NODE_ENV === "production",
 	},
