@@ -55,5 +55,5 @@ USER nextjs
 EXPOSE 3000
 ENV PORT=3000
 
-# Use entrypoint for init container, otherwise just run server
-CMD HOSTNAME="0.0.0.0" node docker-entrypoint.sh
+# Use shell to run the entrypoint script
+CMD ["sh", "docker-entrypoint.sh"]
