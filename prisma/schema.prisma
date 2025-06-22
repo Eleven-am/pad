@@ -186,7 +186,7 @@ model SignedUrl {
   id        String   @id @default(cuid())
   file      File     @relation(fields: [fileId], references: [id], onDelete: Cascade)
   fileId    String
-  url       String   @db.Text
+  url       String
   createdAt DateTime @default(now())
   expiresAt DateTime
 
