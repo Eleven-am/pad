@@ -44,7 +44,7 @@ RUN npx prisma generate
 
 # Build the application
 # Next.js collects telemetry data, disable it in production
-ENV NEXT_TELEMETRY_DISABLED 1
+ENV NEXT_TELEMETRY_DISABLED=1
 # Set dummy values for build time to prevent errors
 ENV BETTER_AUTH_SECRET=build-time-secret
 ENV NEXT_PUBLIC_BASE_URL=http://localhost:3000
@@ -56,8 +56,8 @@ FROM node:20-alpine AS runner
 WORKDIR /app
 
 # Set production environment
-ENV NODE_ENV production
-ENV NEXT_TELEMETRY_DISABLED 1
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
 
 # Create non-root user for security
 RUN addgroup --system --gid 1001 nodejs
@@ -85,6 +85,21 @@ COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
 COPY --from=builder --chown=nextjs:nodejs /app/scripts/db-init.js ./scripts/db-init.js
 COPY --from=builder --chown=nextjs:nodejs /app/src/generated/prisma ./src/generated/prisma
 
+# Create entrypoint script as root
+RUN echo '#!/bin/sh\n\
+set -e\n\
+echo "🔧 Initializing Pad..."\n\
+echo "1️⃣ Generating Prisma Client..."\n\
+npx prisma generate\n\
+echo "2️⃣ Ensuring database schema is up to date..."\n\
+npx prisma db push --skip-generate\n\
+echo "3️⃣ Initializing database..."\n\
+node scripts/db-init.js\n\
+echo "4️⃣ Starting server..."\n\
+exec node server.js' > /app/docker-entrypoint.sh && \
+    chmod +x /app/docker-entrypoint.sh && \
+    chown nextjs:nodejs /app/docker-entrypoint.sh
+
 # Set build-time arguments (populated by GitHub Actions)
 ARG BUILDTIME
 ARG VERSION
@@ -106,26 +121,12 @@ USER nextjs
 EXPOSE 3000
 
 # Set hostname to localhost
-ENV HOSTNAME "0.0.0.0"
-ENV PORT 3000
+ENV HOSTNAME="0.0.0.0"
+ENV PORT=3000
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD node -e "require('http').get('http://localhost:3000/api/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })" || exit 1
-
-# Create entrypoint script
-RUN echo '#!/bin/sh\n\
-set -e\n\
-echo "🔧 Initializing Pad..."\n\
-echo "1️⃣ Generating Prisma Client..."\n\
-npx prisma generate\n\
-echo "2️⃣ Ensuring database schema is up to date..."\n\
-npx prisma db push --skip-generate\n\
-echo "3️⃣ Initializing database..."\n\
-node scripts/db-init.js\n\
-echo "4️⃣ Starting server..."\n\
-exec node server.js' > /app/docker-entrypoint.sh && \
-    chmod +x /app/docker-entrypoint.sh
 
 # Start the application with database initialization
 CMD ["/app/docker-entrypoint.sh"]
