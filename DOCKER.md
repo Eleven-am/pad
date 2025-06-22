@@ -43,6 +43,16 @@ Run with:
 docker compose up -d
 ```
 
+## Automatic Database Initialization
+
+When the Docker container starts, it automatically:
+1. Generates the Prisma client
+2. Creates/updates the database schema
+3. Initializes the database with default configuration
+4. Starts the application
+
+This ensures the app works correctly even with a completely fresh database.
+
 ## Environment Variables
 
 The following environment variables can be configured:

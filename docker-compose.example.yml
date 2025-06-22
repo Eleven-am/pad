@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  pad:
+    image: ghcr.io/eleven-am/pad:latest
+    container_name: pad-blog
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=file:/app/data/pad.db  # SQLite database stored in volume
+      - SECRET=your-secret-key-here-change-this
+      - NEXT_PUBLIC_BASE_URL=http://localhost:3000
+    volumes:
+      - pad_data:/app/data  # Persist database across container restarts
+    restart: unless-stopped
+
+volumes:
+  pad_data:  # Named volume for database persistence

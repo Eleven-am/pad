@@ -4,9 +4,14 @@
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
+    "dev:init": "node scripts/start-with-init.js",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "start:init": "NODE_ENV=production node scripts/start-with-init.js",
+    "lint": "next lint",
+    "db:init": "tsx src/lib/db-init.ts || node scripts/db-init.js",
+    "db:push": "prisma db push",
+    "db:generate": "prisma generate"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

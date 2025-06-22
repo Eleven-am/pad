@@ -1,36 +1,146 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Pad - Professional Block-Based CMS & Blogging Platform
 
-## Getting Started
+<div align="center">
+  <h3>🚀 Create. Publish. Analyze.</h3>
+  <p>A modern, self-hosted content management system with advanced analytics</p>
+  
+  <a href="#features">Features</a> •
+  <a href="#quick-start">Quick Start</a> •
+  <a href="#docker">Docker</a> •
+  <a href="#documentation">Docs</a> •
+  <a href="#license">License</a>
+</div>
 
-First, run the development server:
+---
+
+## What is Pad?
+
+Pad is a professional-grade, block-based content management and blogging platform - think Notion meets Medium with advanced publishing capabilities. It's designed for content creators, technical writers, publishers, and organizations who need sophisticated content creation tools with comprehensive analytics.
+
+### ✨ Key Features
+
+- **🎨 13 Block Types** - Rich content blocks including text, headings, quotes, lists, images, videos, code (with syntax highlighting), tables, charts, callouts, Twitter embeds, Instagram embeds, and polls
+- **📊 Advanced Analytics** - 6 dashboard sections tracking engagement, performance, user behavior, and content metrics
+- **✏️ Professional Publishing** - SEO optimization, scheduled publishing, series support, categories, tags
+- **👥 Collaboration** - Role-based permissions (Admin, Editor, Author, Reader), real-time editing
+- **🔄 Command System** - Undo/redo support with transaction rollback
+- **🐳 Docker Ready** - Multi-architecture support (AMD64/ARM64), one-command deployment
+- **🔒 Security First** - Better Auth integration, API keys, rate limiting, secure by default
+
+## 🚀 Quick Start
+
+### Using Docker (Recommended)
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+# Pull and run
+docker run -d \
+  -p 3000:3000 \
+  -v pad_data:/app/data \
+  -e DATABASE_URL=file:/app/data/pad.db \
+  ghcr.io/eleven-am/pad:latest
+
+# Or use Docker Compose
+curl -O https://raw.githubusercontent.com/eleven-am/pad/main/docker-compose.example.yml
+docker-compose up -d
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Development Setup
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+# Clone the repository
+git clone https://github.com/eleven-am/pad.git
+cd pad
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+# Install dependencies
+npm install
 
-## Learn More
+# Generate Prisma client
+npm run db:generate
 
-To learn more about Next.js, take a look at the following resources:
+# Initialize database
+npm run db:push
+npm run db:init
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+# Start development server
+npm run dev
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Visit `http://localhost:3000` to see your Pad instance running!
 
-## Deploy on Vercel
+## 📚 Documentation
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- [Docker Setup](./DOCKER.md) - Detailed Docker deployment guide
+- [Database Guide](./DOCKER-DATABASE.md) - Database configuration and management
+- [Development](./CLAUDE.md) - Architecture and development guide
+- [Claude Code Guide](./.claude/README.md) - AI assistant configuration
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## 🏗️ Architecture
+
+Pad is built with modern web technologies:
+
+- **Frontend**: Next.js 15, React 19, TypeScript, Tailwind CSS
+- **Backend**: Next.js App Router, Prisma ORM
+- **Database**: SQLite (default), PostgreSQL, MySQL supported
+- **Auth**: Better Auth with social providers
+- **UI**: Shadcn/ui components, Radix UI
+- **Analytics**: Built-in comprehensive analytics system
+
+## 🎯 Use Cases
+
+- **Professional Blogging** - Full-featured blogging with SEO and analytics
+- **Technical Documentation** - Code blocks, charts, and structured content
+- **Content Marketing** - Analytics-driven content creation
+- **Team Publishing** - Multi-author support with permissions
+- **Knowledge Base** - Organize content with categories and series
+
+## 🐳 Docker Deployment
+
+Pad provides official multi-architecture Docker images:
+
+```yaml
+version: '3.8'
+services:
+  pad:
+    image: ghcr.io/eleven-am/pad:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_URL=file:/app/data/pad.db
+      - SECRET=your-secret-key-here
+    volumes:
+      - pad_data:/app/data
+    restart: unless-stopped
+
+volumes:
+  pad_data:
+```
+
+## 🔧 Configuration
+
+Key environment variables:
+
+- `DATABASE_URL` - Database connection string
+- `SECRET` - Session encryption key
+- `NEXT_PUBLIC_BASE_URL` - Public URL of your instance
+- `GOOGLE_CLIENT_ID/SECRET` - Google OAuth (optional)
+- `GITHUB_CLIENT_ID/SECRET` - GitHub OAuth (optional)
+
+## 🤝 Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## 📄 License
+
+This project is licensed under the GPL-3.0 License - see the [LICENSE](LICENSE) file for details.
+
+**Important**: This software is provided "as is", without warranty of any kind. The authors are not responsible for any data loss or damages arising from the use of this software.
+
+## 🙏 Acknowledgments
+
+Built with ❤️ by [Roy OSSAI](https://github.com/eleven-am)
+
+---
+
+<div align="center">
+  <p>If you find Pad useful, please consider giving it a ⭐ on GitHub!</p>
+</div>

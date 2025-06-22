@@ -65,6 +65,10 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
 
+# Copy database initialization script
+COPY --from=builder --chown=nextjs:nodejs /app/scripts/db-init.js ./scripts/db-init.js
+COPY --from=builder --chown=nextjs:nodejs /app/src/generated/prisma ./src/generated/prisma
+
 # Set build-time arguments (populated by GitHub Actions)
 ARG BUILDTIME
 ARG VERSION
@@ -93,5 +97,19 @@ ENV PORT 3000
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD node -e "require('http').get('http://localhost:3000/api/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })" || exit 1
 
-# Start the application
-CMD ["node", "server.js"]
+# Create entrypoint script
+RUN echo '#!/bin/sh\n\
+set -e\n\
+echo "🔧 Initializing Pad..."\n\
+echo "1️⃣ Generating Prisma Client..."\n\
+npx prisma generate\n\
+echo "2️⃣ Ensuring database schema is up to date..."\n\
+npx prisma db push --skip-generate\n\
+echo "3️⃣ Initializing database..."\n\
+node scripts/db-init.js\n\
+echo "4️⃣ Starting server..."\n\
+exec node server.js' > /app/docker-entrypoint.sh && \
+    chmod +x /app/docker-entrypoint.sh
+
+# Start the application with database initialization
+CMD ["/app/docker-entrypoint.sh"]
