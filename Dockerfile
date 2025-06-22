@@ -50,6 +50,9 @@ COPY --from=builder --chown=nextjs:nodejs /app/scripts/db-init.js ./scripts/db-i
 COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
 COPY --from=builder --chown=nextjs:nodejs /app/src/generated/prisma ./src/generated/prisma
 
+# Install Prisma CLI globally at build time (matching client version)
+RUN npm install --global --save-exact "prisma@$(node -p "require('./node_modules/@prisma/client/package.json').version")"
+
 USER nextjs
 
 EXPOSE 3000
