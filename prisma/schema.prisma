@@ -160,8 +160,39 @@ model File {
   // Uploader reference
   uploaderId String
   uploader   User   @relation(fields: [uploaderId], references: [id], onDelete: Cascade)
+  
+  // Analytics and caching
+  accessStats FileAccessStats?
+  signedUrls  SignedUrl[]
 
   @@map("files")
+}
+
+model FileAccessStats {
+  id             String    @id @default(cuid())
+  file           File      @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  fileId         String    @unique
+  totalAccess    Int       @default(0)
+  lastAccessedAt DateTime?
+  lastAccessedBy String? // User ID or "anonymous"
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([fileId])
+  @@map("file_access_stats")
+}
+
+model SignedUrl {
+  id        String   @id @default(cuid())
+  file      File     @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  fileId    String
+  url       String   @db.Text
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+
+  @@index([fileId, expiresAt])
+  @@index([expiresAt])
+  @@map("signed_urls")
 }
 
 model Tag {

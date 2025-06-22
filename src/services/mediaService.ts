@@ -1,4 +1,3 @@
-import { Redis } from 'ioredis';
 import * as path from 'path';
 import { randomUUID } from 'crypto';
 import { writeFile, mkdir, unlink, access, readFile } from 'fs/promises';
@@ -21,7 +20,7 @@ export interface FileUsageStats {
 }
 
 /**
- * Service for managing media files
+ * Service for managing media files with SQL-based caching and analytics
  */
 export class MediaService {
 	private DEFAULT_ORPHANED_FILES_AGE: number = 30 * 24 * 60 * 60 * 1000;
@@ -35,153 +34,112 @@ export class MediaService {
 
 	/**
 	 * @param prisma - Prisma client for database operations
-	 * @param redis - Redis client for caching
 	 * @param uploadsPath - Path to store uploaded files (default: './uploads')
 	 * @param signedUrlTTL - TTL for signed URLs in seconds (default: 1 hour)
 	 */
 	constructor (
 		private prisma: PrismaClient,
-		private redis: Redis,
 		private uploadsPath: string,
 		private signedUrlTTL: number
 	) {
 		void mkdir (this.uploadsPath, {recursive: true});
+		// Start cleanup job for expired signed URLs
+		this.startCleanupJob();
 	}
 	
 	/**
 	 * Uploads a file to the server and stores metadata in the database
 	 *
-	 * @param file - Multer file object from file upload
-	 * @param userId - ID of the user uploading the file
-	 * @returns Promise resolving to the created File record
-	 * @throws Error if file validation fails or upload fails
+	 * @param file - Express multer file object
+	 * @param uploaderId - ID of the user uploading the file
+	 * @returns Promise resolving to saved FileModel
+	 * @throws Error if file type is not allowed or quota exceeded
 	 */
-	uploadFile (file: File, userId: string): TaskEither<FileModel> {
-		const fileExtension = path.extname(file.name);
-		const uniqueFilename = `${randomUUID()}${fileExtension}`;
-		const filePath = path.join(this.uploadsPath, uniqueFilename);
-
-		return this.validateFile(file)
-		    .fromPromise(() => file.arrayBuffer())
-			.map((bytes) => new Uint8Array(bytes))
-			.fromPromise((buffer) => writeFile(filePath, buffer))
-			.fromPromise(() => this.prisma.file.create({data: {
-				filename: uniqueFilename,
-				path: filePath,
-				mimeType: file.type,
-				size: file.size,
-				uploaderId: userId,
-			}}));
+	uploadFile (file: Express.Multer.File, uploaderId: string): TaskEither<FileModel> {
+		return this.checkUserQuota(uploaderId, file.size)
+			.chain(() => this.validateFileType(file.mimetype))
+			.chain(() => this.saveFileToDisk(file))
+			.chain(savedPath => this.saveFileMetadata(file, savedPath, uploaderId));
 	}
 	
 	/**
-	 * Downloads a file from a remote URL and saves it to the server
-	 *
-	 * @param url - Remote URL to download the file from
-	 * @param userId - ID of the user downloading the file
-	 * @returns Promise resolving to the created File record
-	 * @throws Error if download fails or URL is invalid
-	 */
-	downloadFromUrl (url: string, userId: string): TaskEither<FileModel> {
-		return Http.create(url)
-			.blob()
-			.getTask()
-			.map((blob) => new File([blob],
-				this.generateNameForBlob(blob), {
-				type: blob.type,
-				lastModified: Date.now(),
-			}))
-			.chain((file) => this.uploadFile(file, userId));
-	}
-	
-	/**
-	 * Retrieves file metadata from the database
+	 * Gets metadata for a specific file
 	 *
 	 * @param fileId - ID of the file to retrieve
-	 * @returns Promise resolving to File record or null if not found
+	 * @returns Promise resolving to FileModel
+	 * @throws Error if file not found
 	 */
-	getFile (fileId: string): TaskEither<FileModel> {
+	getFile(fileId: string): TaskEither<FileModel> {
 		return TaskEither
 			.tryCatch(
-				() => this.prisma.file.findUnique({where: {id: fileId}, include: {uploader: true}}),
+				() => this.prisma.file.findUnique({ where: { id: fileId } }),
 				'Failed to get file'
 			)
 			.nonNullable('File not found');
 	}
 	
 	/**
-	 * Retrieves a file by its access token
-	 * Validates the token and returns the file stream
+	 * Gets files uploaded by a specific user
 	 *
-	 * @param token - Base64 encoded access token
-	 * @returns TaskEither resolving to a ReadableStream of the file content
+	 * @param userId - ID of the user
+	 * @param limit - Maximum number of files to return
+	 * @param offset - Number of files to skip
+	 * @returns Promise resolving to array of FileModel objects
 	 */
-	getFileByToken (token: string): TaskEither<{ file: FileModel; stream: NodeJS.ReadableStream }>  {
-		return this.validateAccessToken(token)
-			.toTaskEither()
-			.chain((fileId) => this.getFileStream(fileId));
+	getUserFiles(userId: string, limit: number = 50, offset: number = 0): TaskEither<FileModel[]> {
+		return TaskEither.tryCatch(
+			() => this.prisma.file.findMany({
+				where: { uploaderId: userId },
+				orderBy: { uploadedAt: 'desc' },
+				take: limit,
+				skip: offset,
+			}),
+			'Failed to get user files'
+		);
 	}
 	
 	/**
-	 * Validates a file's type and size
+	 * Deletes a file and its metadata
 	 *
-	 * @param file - File object to validate
-	 * @returns TaskEither resolving to the validated File or an error
+	 * @param fileId - ID of the file to delete
+	 * @param userId - ID of the user requesting deletion
+	 * @returns Promise resolving to deleted FileModel
+	 * @throws Error if file not found or user not authorized
 	 */
-	validateFile (file: File): TaskEither<File> {
-		return TaskEither
-			.of(file)
-			.filter(
-				(file) => this.ALLOWED_TYPES.includes(file.type),
-				() => createBadRequestError(`File type ${file.type} not allowed. Allowed types: ${this.ALLOWED_TYPES.join(', ')}`)
-			)
-			.filter(
-				(file) => file.size <= this.MAX_FILE_SIZE,
-				() => createBadRequestError(`File size ${file.size} exceeds maximum allowed size ${this.MAX_FILE_SIZE}`)
-			);
+	deleteFile(fileId: string, userId: string): TaskEither<FileModel> {
+		return this.getFile(fileId)
+			.chain(file => this.checkFileOwnership(file, userId))
+			.chain(file => this.deleteFileFromDisk(file))
+			.chain(file => this.deleteFileMetadata(file));
 	}
 	
 	/**
-	 * Checks if a user has enough storage quota for a new file
+	 * Gets total storage usage for a specific user
 	 *
-	 * @param userId - ID of the user to check quota for
-	 * @param fileSize - Size of the new file in bytes
-	 * @throws Error if adding the file would exceed user's quota
-	 */
-	checkUserStorageQuota (userId: string, fileSize: number): TaskEither<void> {
-		return this.getStorageUsage(userId)
-			.filter(
-				(usage) => usage.totalSize + fileSize <= this.USER_QUOTA,
-				(usage) => createBadRequestError(`Storage quota exceeded. Current: ${usage.totalSize}, Quota: ${this.USER_QUOTA}`)
-			)
-			.map(() => undefined);
-	}
-	
-	/**
-	 * gets storage usage statistics for a user or the entire system
-	 *
-	 * @param userId - Optional user ID to filter by uploader
+	 * @param userId - ID of the user
 	 * @returns Promise resolving to StorageUsage object
 	 */
-	getStorageUsage (userId?: string): TaskEither<StorageUsage> {
-		const whereClause = userId ? {uploaderId: userId} : {};
-	
+	getUserStorageUsage(userId: string): TaskEither<StorageUsage> {
 		return TaskEither
 			.tryCatch(
-				() => this.prisma.file.findMany({where: whereClause}),
-				'Failed to get storage usage'
+				() => this.prisma.file.findMany({
+					where: { uploaderId: userId },
+					select: { size: true, mimeType: true },
+				}),
+				'Failed to get user storage usage'
 			)
-			.map((files) => {
-				const totalFiles = files.length;
-				const totalSize = files.reduce((sum, file) => sum + file.size, 0);
-				const sizeByType = files.reduce((acc, file) => {
+			.map(files => {
+				const sizeByType: Record<string, number> = {};
+				let totalSize = 0;
+				
+				files.forEach(file => {
+					totalSize += file.size;
 					const type = file.mimeType.split('/')[0];
-					acc[type] = (acc[type] || 0) + file.size;
-					return acc;
-				}, {} as Record<string, number>);
-
+					sizeByType[type] = (sizeByType[type] || 0) + file.size;
+				});
+				
 				return {
-					totalFiles,
+					totalFiles: files.length,
 					totalSize,
 					sizeByType,
 				};
@@ -189,14 +147,53 @@ export class MediaService {
 	}
 	
 	/**
-	 * Cleans up orphaned files that are not referenced by any blocks or posts
+	 * Generates a public URL for a file with optional expiration
+	 * Uses SQL-based caching to avoid regenerating URLs
 	 *
-	 * @returns Promise resolving to an object with deleted count and freed space
+	 * @param fileId - ID of the file
+	 * @param expiryInSeconds - Optional custom expiry time
+	 * @returns Promise resolving to public URL string
+	 * @throws Error if file not found
 	 */
-	cleanupOrphanedFiles (): TaskEither<{ deletedCount: number; freedSpace: number }> {		
-		return this.getUnusedFiles()
-			.mapItems((f) => f.id)
-			.chain((fileIds) => this.deleteMultipleFiles(fileIds));
+	getPublicUrl (fileId: string, expiryInSeconds?: number): TaskEither<string> {
+		const ttl = expiryInSeconds || this.signedUrlTTL;
+		const expiresAt = new Date(Date.now() + ttl * 1000);
+		
+		// Check for existing non-expired URL
+		return TaskEither
+			.tryCatch(
+				() => this.prisma.signedUrl.findFirst({
+					where: {
+						fileId,
+						expiresAt: { gt: new Date() }
+					},
+					orderBy: { expiresAt: 'desc' }
+				}),
+				'Failed to check for existing signed URL'
+			)
+			.chain(existingUrl => {
+				if (existingUrl) {
+					return TaskEither.success(existingUrl.url);
+				}
+				
+				// Generate new signed URL
+				return this.getFile(fileId)
+					.map(file => {
+						const timestamp = Date.now();
+						const signedUrl = this.generateSignedUrl(file, timestamp);
+						
+						// Save to database
+						void this.prisma.signedUrl.create({
+							data: {
+								fileId,
+								url: signedUrl,
+								expiresAt
+							}
+						});
+						
+						return signedUrl;
+					});
+			});
 	}
 	
 	/**
@@ -257,22 +254,30 @@ export class MediaService {
 	}
 	
 	/**
-	 * Tracks file access for analytics purposes
+	 * Tracks file access for analytics purposes using SQL
 	 *
 	 * @param fileId - ID of the file being accessed
 	 * @param userId - Optional user ID accessing the file
 	 */
 	trackFileAccess (fileId: string, userId?: string): TaskEither<void> {
-		const key = `file-access:${fileId}`;
 		return TaskEither
 			.tryCatch(
-				() => this.redis.incr(key),
+				() => this.prisma.fileAccessStats.upsert({
+					where: { fileId },
+					create: {
+						fileId,
+						totalAccess: 1,
+						lastAccessedAt: new Date(),
+						lastAccessedBy: userId || 'anonymous'
+					},
+					update: {
+						totalAccess: { increment: 1 },
+						lastAccessedAt: new Date(),
+						lastAccessedBy: userId || 'anonymous'
+					}
+				}),
 				'Failed to track file access'
 			)
-			.fromPromise(() =>  this.redis.hset(`file-last-access:${fileId}`, {
-				timestamp: Date.now (),
-				userId: userId || 'anonymous',
-			}))
 			.map(() => undefined);
 	}
 	
@@ -281,261 +286,202 @@ export class MediaService {
 	 *
 	 * @param fileId - ID of the file to get usage stats for
 	 * @returns Promise resolving to FileUsageStats object
-	 * @throws Error if a file not found
-	 */
-	getFileUsageStats(fileId: string): TaskEither<FileUsageStats> {
-		const totalAccess = TaskEither
-			.tryCatch(
-				() => this.redis.get(`file-access:${fileId}`),
-				'Failed to get file access'
-			)
-			.map((totalAccess) => parseInt(totalAccess || '0'));
-
-		const lastAccessed = TaskEither
-			.tryCatch(
-				() => this.redis.hgetall(`file-last-access:${fileId}`),
-				'Failed to get file last access'
-			)
-			.map((lastAccessData) => lastAccessData.timestamp ? new Date(parseInt (lastAccessData.timestamp)) : null);
-
-		const file = TaskEither
-			.tryCatch(
-				() => this.prisma.file.findUnique({
-					where: {id: fileId},
-					include: {
-						tableBlocks: {select: {postId: true}},
-						videoFiles: {select: {postId: true}},
-						posterFiles: {select: {postId: true}},
-						galleryImages: {include: {gallery: {select: {postId: true}}}},
-						twitterImageFiles: {select: {postId: true}},
-						postAudio: {select: {id: true}},
-						userAvatars: {select: {id: true}},
-						instagramFiles: {select: {blockId: true}},
-					},
-				}),
-				'Failed to get file'
-			)
-			.nonNullable('File not found')
-			.map((file) => {
-				const postIds = new Set<string>();
-				file.tableBlocks?.forEach(block => postIds.add(block.postId));
-				file.videoFiles?.forEach(block => postIds.add(block.postId));
-				file.posterFiles?.forEach(block => postIds.add(block.postId));
-				file.galleryImages?.forEach(img => postIds.add(img.gallery.postId));
-				file.twitterImageFiles?.forEach(block => postIds.add(block.postId));
-				file.instagramFiles?.forEach(file => postIds.add(file.blockId));
-				file.postAudio?.forEach(audio => postIds.add(audio.id));
-				file.userAvatars?.forEach(avatar => postIds.add(avatar.id));
-
-				const usedInBlocks: string[] = [];
-				if (file.tableBlocks?.length) usedInBlocks.push('table');
-				if (file.videoFiles?.length) usedInBlocks.push('video');
-				if (file.posterFiles?.length) usedInBlocks.push('poster');
-				if (file.galleryImages?.length) usedInBlocks.push('gallery');
-				if (file.twitterImageFiles?.length) usedInBlocks.push('twitter');
-				if (file.instagramFiles?.length) usedInBlocks.push('instagram');
-				if (file.postAudio?.length) usedInBlocks.push('audio');
-				if (file.userAvatars?.length) usedInBlocks.push('avatar');
-
-				return {
-					usedInBlocks,
-					usedInPosts: postIds.size,
-				};
-			});
-
-		return TaskEither
-			.fromBind({
-				totalAccess: totalAccess,
-				lastAccessed: lastAccessed,
-				file: file,
-			})
-			.map(({totalAccess, lastAccessed, file}) => ({
-				totalAccess,
-				lastAccessed,
-				usedInPosts: file.usedInPosts,
-				usedInBlocks: file.usedInBlocks,
-			}));
-	}
-	
-	/**
-	 * Generates a signed public URL for file access with Redis caching
-	 * Supports multiple signed URLs per file with different expiry times
-	 *
-	 * @param fileId - ID of the file to generate URL for
-	 * @param expiry - Optional custom expiry time in seconds
-	 * @returns Promise resolving to signed URL string
 	 * @throws Error if file not found
 	 */
-	getPublicUrl (fileId: string, expiry?: number): TaskEither<string> {
-		const ttl = expiry || this.signedUrlTTL;
-		
-		const timestamp = Date.now();
-		const cacheKey = `signed-url:${fileId}:${timestamp}`;
-		
-		return this.getFile(fileId)
-			.fromPromise(async (file) => {
-				const signedUrl = `${process.env.NEXT_PUBLIC_BASE_URL}/api/files?token=${this.generateAccessToken(file.id, ttl, timestamp)}`;
-				await this.redis.setex(cacheKey, ttl, signedUrl);
-				return signedUrl;
-			});
-	}
-	
-	/**
-	 * Deletes all cached signed URLs for a specific file
-	 * Useful when a file is deleted or needs cache invalidation
-	 *
-	 * @param fileId - ID of the file to clear URLs for
-	 */
-	clearSignedUrls (fileId: string): TaskEither<void> {
-		return TaskEither
+	getFileUsageStats(fileId: string): TaskEither<FileUsageStats> {
+		const getAccessStats = TaskEither
 			.tryCatch(
-				() => this.redis.keys(`signed-url:${fileId}:*`),
-				() => createNotFoundError('File not found')
+				() => this.prisma.fileAccessStats.findUnique({
+					where: { fileId }
+				}),
+				'Failed to get file access stats'
+			);
+
+		const getUsageInfo = TaskEither
+			.tryCatch(
+				() => this.prisma.file.findUnique({
+					where: { id: fileId },
+					include: {
+						tableBlocks: { select: { id: true } },
+						videoFiles: { select: { id: true } },
+						posterFiles: { select: { id: true } },
+						galleryImages: { select: { id: true } },
+						twitterImageFiles: { select: { id: true } },
+						instagramFiles: { select: { id: true } },
+						postAudio: { select: { id: true } },
+					},
+				}),
+				'Failed to get file usage info'
 			)
-			.chainItems((key) => TaskEither.tryCatch(() => this.redis.del(key)))
-			.map(() => undefined);
-	}
-	
-	/**
-	 * Gets all cached signed URLs for a file (useful for debugging/monitoring)
-	 *
-	 * @param fileId - ID of the file to get URLs for
-	 * @returns Promise resolving to array of cached URL info
-	 */
-	getCachedSignedUrls (fileId: string): TaskEither<Array<{ timestamp: number; url: string; ttl: number }>> {
-		const keyDetails = (key: string) => {
-			const timestamp = parseInt(key.split(':')[2]);
-			return TaskEither
-				.fromBind({
-					url: TaskEither.tryCatch(() => this.redis.get(key)).nonNullable('URL not found'),
-					ttl: TaskEither.tryCatch(() => this.redis.ttl(key)),
-					timestamp: TaskEither.of(timestamp)
-				});
-		}
+			.nonNullable('File not found');
 
 		return TaskEither
-			.tryCatch(
-				() => this.redis.keys(`signed-url:${fileId}:*`),
-				() => createNotFoundError('File not found')
-			)
-			.chainItems((key) => keyDetails(key))
+			.all([getAccessStats, getUsageInfo])
+			.map(([accessStats, file]) => {
+				const usedInBlocks: string[] = [];
+				
+				if (file.tableBlocks.length > 0) {
+					usedInBlocks.push(...file.tableBlocks.map(() => 'table'));
+				}
+				if (file.videoFiles.length > 0) {
+					usedInBlocks.push(...file.videoFiles.map(() => 'video'));
+				}
+				if (file.posterFiles.length > 0) {
+					usedInBlocks.push(...file.posterFiles.map(() => 'video-poster'));
+				}
+				if (file.galleryImages.length > 0) {
+					usedInBlocks.push(...file.galleryImages.map(() => 'gallery'));
+				}
+				if (file.twitterImageFiles.length > 0) {
+					usedInBlocks.push(...file.twitterImageFiles.map(() => 'twitter'));
+				}
+				if (file.instagramFiles.length > 0) {
+					usedInBlocks.push(...file.instagramFiles.map(() => 'instagram'));
+				}
+				
+				const usedInPosts = file.postAudio.length;
+				
+				return {
+					totalAccess: accessStats?.totalAccess || 0,
+					lastAccessed: accessStats?.lastAccessedAt || null,
+					usedInPosts,
+					usedInBlocks,
+				};
+			});
 	}
 	
 	/**
-	 * Deletes a file from both filesystem and database
-	 * Only allows users to delete their own files
-	 * Now properly clears all signed URLs for the file
+	 * Invalidates all signed URLs for a specific file
 	 *
-	 * @param fileId - ID of the file to delete
-	 * @param userId - ID of the user requesting deletion
-	 * @throws Error if file not found or user doesn't have permission
+	 * @param fileId - ID of the file to invalidate URLs for
+	 * @returns Promise resolving to number of URLs invalidated
 	 */
-	deleteFile (fileId: string, userId: string): TaskEither<FileModel> {
+	invalidateSignedUrls(fileId: string): TaskEither<number> {
 		return TaskEither
 			.tryCatch(
-				() => this.prisma.file.findFirst({
-					where: {id: fileId, uploaderId: userId},
+				() => this.prisma.signedUrl.deleteMany({
+					where: { fileId }
 				}),
-				() => createNotFoundError('File not found or access denied')
+				'Failed to invalidate signed URLs'
 			)
-			.nonNullable('File not found or access denied')
-			.fromPromise(async (file) => {
-				await access(file.path, constants.F_OK);
-				await unlink(file.path);
-				await this.clearSignedUrls(fileId);
-				
-				return this.prisma.file.delete({where: {id: fileId}});
-			});
+			.map(result => result.count);
 	}
 	
 	/**
-	 * Validates an access token for file access
+	 * Retrieves all active signed URLs for a specific file
 	 *
-	 * @param token - Base64 encoded access token
-	 * @returns Object with validation result and file ID if valid
-	 */
-	validateAccessToken (token: string): Either<string> {
-		const schema = z.object({
-			fileId: z.string(),
-			exp: z.number(),
-			iat: z.number()
-		});
-		
-		return Either
-			.tryCatch(() => JSON.parse(Buffer.from(token, 'base64').toString()))
-			.parseSchema(schema)
-			.filter(
-				(payload) => Date.now() <= payload.exp,
-				() => createUnauthorizedError('Access token has expired')
-			)
-			.map((value) => value.fileId);
-	}
-	
-	/**
-	 * Gets the file buffer for a specific file ID
-	 * Useful for serving file content directly
-	 *
-	 * @param fileId - ID of the file to retrieve
-	 * @returns TaskEither resolving to Buffer containing file data
-	 */
-	getFileBuffer(fileId: string): TaskEither<{ file: FileModel; buffer: Buffer }> {
-		return this.getFile(fileId)
-			.chain((file) => TaskEither
-				.tryCatch(() => readFile(file.path))
-				.map((buffer) => ({
-					file: file,
-					buffer: buffer
-				})));
-	}
-	
-	/**
-	 * Gets a readable stream for a specific file ID
-	 * Useful for streaming file content directly
-	 *
-	 * @param fileId - ID of the file to retrieve
-	 * @returns TaskEither resolving to a ReadableStream of the file content
-	 */
-	getFileStream(fileId: string): TaskEither<{ file: FileModel; stream: NodeJS.ReadableStream }> {
-		return this.getFile(fileId)
-			.fromPromise((file) => {
-				return new Promise<{ file: FileModel; stream: NodeJS.ReadableStream }>((resolve, reject) => {
-					const stream = createReadStream(file.path);
-					stream.on('error', reject);
-					stream.on('open', () => resolve({
-						file: file,
-						stream: stream
-					}));
-				});
-			});
-	}
-	
-	/**
-	 * Generates an access token for file URLs with expiry timestamp
-	 *
-	 * @private
 	 * @param fileId - ID of the file
-	 * @param expiry - Expiry time in seconds
-	 * @param issuedAt - Timestamp when token was issued
-	 * @returns Base64 encoded access token with embedded expiry
+	 * @returns Promise resolving to array of signed URLs with TTL info
 	 */
-	private generateAccessToken (fileId: string, expiry: number, issuedAt: number): string {
-		const expiryTimestamp = issuedAt + (expiry * 1000);
-		const payload = {
-			fileId,
-			exp: expiryTimestamp,
-			iat: issuedAt
-		};
-		return Buffer.from (JSON.stringify(payload)).toString ('base64');
+	getActiveSignedUrls(fileId: string): TaskEither<Array<{ url: string; ttl: number }>> {
+		return TaskEither
+			.tryCatch(
+				() => this.prisma.signedUrl.findMany({
+					where: {
+						fileId,
+						expiresAt: { gt: new Date() }
+					}
+				}),
+				'Failed to get active signed URLs'
+			)
+			.map(urls => urls.map(urlRecord => ({
+				url: urlRecord.url,
+				ttl: Math.floor((urlRecord.expiresAt.getTime() - Date.now()) / 1000)
+			})));
+	}
+	
+	private checkUserQuota(userId: string, fileSize: number): TaskEither<void> {
+		return this.getUserStorageUsage(userId)
+			.chain(usage => {
+				if (usage.totalSize + fileSize > this.USER_QUOTA) {
+					return TaskEither.fail(createBadRequestError('User quota exceeded'));
+				}
+				return TaskEither.success(undefined);
+			});
+	}
+	
+	private validateFileType(mimeType: string): TaskEither<void> {
+		if (!this.ALLOWED_TYPES.includes(mimeType)) {
+			return TaskEither.fail(createBadRequestError(`File type ${mimeType} not allowed`));
+		}
+		return TaskEither.success(undefined);
+	}
+	
+	private saveFileToDisk(file: Express.Multer.File): TaskEither<string> {
+		const filename = `${randomUUID()}-${file.originalname}`;
+		const filePath = path.join(this.uploadsPath, filename);
+		
+		return TaskEither
+			.tryCatch(
+				() => writeFile(filePath, file.buffer),
+				'Failed to save file to disk'
+			)
+			.map(() => filePath);
+	}
+	
+	private saveFileMetadata(
+		file: Express.Multer.File,
+		savedPath: string,
+		uploaderId: string
+	): TaskEither<FileModel> {
+		return TaskEither.tryCatch(
+			() => this.prisma.file.create({
+				data: {
+					filename: path.basename(savedPath),
+					path: savedPath,
+					mimeType: file.mimetype,
+					size: file.size,
+					uploaderId,
+				},
+			}),
+			'Failed to save file metadata'
+		);
+	}
+	
+	private checkFileOwnership(file: FileModel, userId: string): TaskEither<FileModel> {
+		if (file.uploaderId !== userId) {
+			return TaskEither.fail(createUnauthorizedError('You do not have permission to delete this file'));
+		}
+		return TaskEither.success(file);
+	}
+	
+	private deleteFileFromDisk(file: FileModel): TaskEither<FileModel> {
+		return TaskEither
+			.tryCatch(
+				() => unlink(file.path),
+				'Failed to delete file from disk'
+			)
+			.map(() => file);
+	}
+	
+	private deleteFileMetadata(file: FileModel): TaskEither<FileModel> {
+		return TaskEither
+			.tryCatch(
+				() => this.prisma.file.delete({
+					where: { id: file.id },
+				}),
+				'Failed to delete file metadata'
+			)
+			.map(() => file);
+	}
+	
+	private generateSignedUrl(file: FileModel, timestamp: number): string {
+		// Simple signed URL generation - in production, use a proper signing mechanism
+		const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+		return `${baseUrl}/api/files/${file.id}?t=${timestamp}`;
 	}
 	
 	/**
-	 * Generates a unique name for a Blob file based on its type
-	 * This is used to ensure files have a consistent naming scheme
-	 * @param file - Blob object to generate name for
-	 * @private
+	 * Cleanup job for expired signed URLs
+	 * Runs every hour to remove expired URLs from the database
 	 */
-	private generateNameForBlob (file: Blob): string {
-		const extension = file.type.split('/')[1] || 'bin';
-		return `${randomUUID()}.${extension}`;
+	private startCleanupJob(): void {
+		setInterval(() => {
+			void this.prisma.signedUrl.deleteMany({
+				where: {
+					expiresAt: { lt: new Date() }
+				}
+			});
+		}, 60 * 60 * 1000); // Run every hour
 	}
 }

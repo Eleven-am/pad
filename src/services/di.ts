@@ -1,5 +1,4 @@
-import { Redis } from "ioredis";
-import { getOrDefault, getOrThrow } from "@/lib/server-utils";
+import { getOrDefault } from "@/lib/server-utils";
 import { PrismaClient } from "@/generated/prisma";
 import { MediaService } from "@/services/mediaService";
 import { TableService } from "@/services/tableService";
@@ -15,20 +14,12 @@ import { PostExcerptService } from "@/services/postExcerptService";
 import { createEmailService } from "@/services/emailService";
 import { NewsletterService } from "@/services/newsletterService";
 
-const redis = new Redis({
-	host: getOrThrow('REDIS_HOST'),
-	port: parseInt(getOrThrow('REDIS_PORT'), 10),
-	password: getOrDefault('REDIS_PASSWORD'),
-	db: parseInt(getOrThrow('REDIS_DB'), 10),
-});
-
 const prisma = new PrismaClient();
 
 export const mediaService = new MediaService(
 	prisma,
-	redis,
-	getOrThrow('MEDIA_BASE_PATH'),
-	parseInt(getOrThrow('MEDIA_MAX_SIZE'), 10),
+	getOrDefault('MEDIA_BASE_PATH', './uploads'),
+	parseInt(getOrDefault('MEDIA_MAX_SIZE', '3600'), 10), // 1 hour default TTL for signed URLs
 );
 
 export const tableService = new TableService(prisma, mediaService);
