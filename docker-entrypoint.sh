@@ -1,17 +1,17 @@
 #!/bin/sh
 set -e
 
-echo "🔧 Initializing Pad..."
+# If running migrations, do that and exit
+if [ "$1" = "migrate" ]; then
+    echo "🔄 Running database migrations..."
+    npx prisma migrate deploy
+    echo "🌱 Initializing database..."
+    node scripts/db-init.js
+    echo "✅ Migration completed"
+    exit 0
+fi
 
-echo "1️⃣ Generating Prisma Client..."
-prisma generate
-
-echo "2️⃣ Ensuring database schema is up to date..."
-prisma db push --skip-generate
-
-echo "3️⃣ Initializing database..."
-node scripts/db-init.js
-
-echo "4️⃣ Starting server..."
+# Otherwise, start the application
+echo "🚀 Starting Pad application..."
 export HOSTNAME="0.0.0.0"
-exec node server.js
+exec "$@"
