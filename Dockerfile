@@ -23,6 +23,11 @@ FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+
+# Generate Prisma client before building
+RUN npx prisma generate
+
+# Now build the application
 RUN npm run build
 
 # 3. Production image, copy all the files and run next
