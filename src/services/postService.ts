@@ -142,21 +142,22 @@ export class PostService extends BaseService {
 	getPostById(id: string, userId?: string): TaskEither<PostWithDetails> {
 		return TaskEither
 			.tryCatch(
-				() => {
-					if (userId) {
-						// If userId is provided, get post if user is author/collaborator OR post is published
-						return this.prisma.post.findFirst({
-							where: {
+				() => this.prisma.post.findFirst({
+					where: {
+						OR: [
+							{
+								id,
+								published: true,
+								publishedAt: { lte: new Date() }
+							},
+							{
 								id,
 								OR: [
-									// Post is published and time has arrived
 									{
 										published: true,
 										publishedAt: { lte: new Date() }
 									},
-									// User is the author
 									{ authorId: userId },
-									// User is a collaborator
 									{
 										collaborators: {
 											some: { userId }
@@ -164,20 +165,10 @@ export class PostService extends BaseService {
 									}
 								]
 							},
-							include: this.getPostInclude(),
-						});
-					} else {
-						// No userId provided, only return published posts
-						return this.prisma.post.findFirst({
-							where: {
-								id,
-								published: true,
-								publishedAt: { lte: new Date() }
-							},
-							include: this.getPostInclude(),
-						});
-					}
-				},
+						]
+					},
+					include: this.getPostInclude(),
+				}),
 				'Failed to fetch post by ID'
 			)
 			.nonNullable('Post not found')
@@ -299,19 +290,15 @@ export class PostService extends BaseService {
 				(date) => date > new Date(),
 				() => createInternalError('Scheduled date must be in the future')
 			)
-			.chain(() => this.performTransactionTask((tx) =>
-				TaskEither.tryCatch(
-					() => tx.post.update({
-						where: { id },
-						data: {
-							published: true,
-							publishedAt: scheduledAt,
-							scheduledAt
-						},
-					}),
-					'Failed to schedule post'
-				)
-			))
+			.fromPromise(() => this.prisma.post.update({
+					where: { id },
+					data: {
+						published: true,
+						publishedAt: scheduledAt,
+						scheduledAt
+					},
+				})
+			)
 			.chain(() => this.getPostById(id, userId));
 	}
 	
@@ -460,51 +447,33 @@ export class PostService extends BaseService {
 			return TaskEither.of([]);
 		}
 
-		return TaskEither
-			.tryCatch(
-				() => {
-					const baseWhere = {
-						id: { in: ids },
-					};
-
-					if (userId) {
-						// If userId is provided, get posts if user is author/collaborator OR post is published
-						return this.prisma.post.findMany({
-							where: {
-								...baseWhere,
-								OR: [
-									// Post is published and time has arrived
-									{
-										published: true,
-										publishedAt: { lte: new Date() }
-									},
-									// User is the author
-									{ authorId: userId },
-									// User is a collaborator
-									{
-										collaborators: {
-											some: { userId }
-										}
+		return TaskEither.tryCatch(
+			() => this.prisma.post.findMany({
+				where: {
+					OR: [
+						{
+							id: { in: ids },
+							published: true,
+							publishedAt: { lte: new Date() }
+						},
+						{
+							id: { in: ids },
+							OR: [
+								{ authorId: userId },
+								{
+									collaborators: {
+										some: { userId }
 									}
-								]
-							},
-							include: this.getPostInclude(),
-						});
-					} else {
-						// No userId provided, only return published posts
-						return this.prisma.post.findMany({
-							where: {
-								...baseWhere,
-								published: true,
-								publishedAt: { lte: new Date() }
-							},
-							include: this.getPostInclude(),
-						});
-					}
+								}
+							]
+						}
+					]
 				},
-				'Failed to fetch posts by IDs'
-			)
-			.map((posts) => posts.map(post => this.transformToPostWithDetails(post)));
+				include: this.getPostInclude(),
+			}),
+			'Failed to fetch posts by IDs'
+		)
+		.mapItems((post) => this.transformToPostWithDetails(post));
 	}
 	
 	/**
