@@ -30,35 +30,23 @@ spec:
       securityContext:
         fsGroup: 1001  # nodejs group from Dockerfile
       
-      # Init containers for migrations and permissions
+      # Init container to fix NFS volume permissions
       initContainers:
-        - name: db-migrator
-          image: ghcr.io/eleven-am/pad:latest
-          command: ["migrate"]
-          envFrom:
-            - configMapRef:
-                name: pad-config
-          env:
-            - name: BETTER_AUTH_SECRET
-              valueFrom:
-                secretKeyRef:
-                  name: pad-secrets
-                  key: BETTER_AUTH_SECRET
-          volumeMounts:
-            - name: data-storage
-              mountPath: /app/data
-        
         - name: fix-permissions
           image: busybox:1.36-musl
           command:
             - sh
             - -c
             - |
-              echo "Fixing permissions for /app/data and /app/public/uploads directories..."
+              echo "Fixing permissions for NFS volumes..."
               mkdir -p /app/data /app/public/uploads
               chown -R 1001:1001 /app/data /app/public/uploads
               chmod -R 755 /app/data /app/public/uploads
               echo "Permissions fixed successfully"
+              echo "Data directory:"
+              ls -la /app/data
+              echo "Uploads directory:"
+              ls -la /app/public/uploads
           volumeMounts:
             - name: data-storage
               mountPath: /app/data
@@ -67,21 +55,21 @@ spec:
           securityContext:
             runAsUser: 0
             runAsGroup: 0
-      
+
       containers:
         - name: pad
-          image: ghcr.io/eleven-am/pad:latest
+          image: elevenam/pad:latest
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
               containerPort: 3000
               protocol: TCP
-          
+
           # Environment variables from ConfigMap
           envFrom:
             - configMapRef:
                 name: pad-config
-          
+
           # Environment variables from Secret
           env:
             - name: BETTER_AUTH_SECRET
@@ -89,49 +77,49 @@ spec:
                 secretKeyRef:
                   name: pad-secrets
                   key: BETTER_AUTH_SECRET
-          
+
           # Volume mounts
           volumeMounts:
             - name: data-storage
               mountPath: /app/data
             - name: uploads-storage
               mountPath: /app/public/uploads
-          
-          # Health checks
+
+          # Health checks - give more time for migration on startup
           livenessProbe:
             httpGet:
               path: /api/health
               port: 3000
               scheme: HTTP
-            initialDelaySeconds: 30
+            initialDelaySeconds: 60  # Increased for migration time
             periodSeconds: 10
             timeoutSeconds: 5
             successThreshold: 1
             failureThreshold: 3
-          
+
           readinessProbe:
             httpGet:
               path: /api/health
               port: 3000
               scheme: HTTP
-            initialDelaySeconds: 10
+            initialDelaySeconds: 30  # Increased for migration time
             periodSeconds: 5
             timeoutSeconds: 3
             successThreshold: 1
             failureThreshold: 3
-          
-          # Startup probe for slow initialization
+
+          # Startup probe for slow initialization (including migrations)
           startupProbe:
             httpGet:
               path: /api/health
               port: 3000
               scheme: HTTP
-            initialDelaySeconds: 5
+            initialDelaySeconds: 10
             periodSeconds: 10
             timeoutSeconds: 5
             successThreshold: 1
-            failureThreshold: 30  # Allow up to 5 minutes for startup (database init)
-          
+            failureThreshold: 60  # Allow up to 10 minutes for startup + migration
+
           # Resource limits and requests
           resources:
             requests:
@@ -140,7 +128,7 @@ spec:
             limits:
               memory: "1Gi"
               cpu: "500m"
-          
+
           # Security context
           securityContext:
             allowPrivilegeEscalation: false
@@ -151,7 +139,7 @@ spec:
             capabilities:
               drop:
                 - ALL
-      
+
       # Volumes
       volumes:
         - name: data-storage
@@ -160,17 +148,7 @@ spec:
         - name: uploads-storage
           persistentVolumeClaim:
             claimName: pad-uploads-pvc
-      
+
       # Pod-level settings
       restartPolicy: Always
       terminationGracePeriodSeconds: 30
-      
-      # Node selection (optional)
-      # nodeSelector:
-      #   kubernetes.io/arch: amd64
-      
-      # Tolerations (optional)
-      # tolerations: []
-      
-      # Affinity (optional)
-      # affinity: {}
