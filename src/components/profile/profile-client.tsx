@@ -35,6 +35,7 @@ export function ProfileClient({ initialData }: ProfileClientProps) {
     twitter: initialData.user.twitter || '',
     linkedin: initialData.user.linkedin || '',
     github: initialData.user.github || '',
+    instagram: initialData.user.instagram || '',
   });
 
   const handleInputChange = (field: string, value: string) => {
@@ -51,6 +52,7 @@ export function ProfileClient({ initialData }: ProfileClientProps) {
         twitter: profileData.twitter,
         linkedin: profileData.linkedin,
         github: profileData.github,
+        instagram: profileData.instagram,
       });
 
       if (result.success) {
@@ -372,6 +374,17 @@ export function ProfileClient({ initialData }: ProfileClientProps) {
                         id="github"
                         value={profileData.github}
                         onChange={(e) => handleInputChange('github', e.target.value)}
+                        placeholder="@username"
+                        className="border-input"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="instagram">Instagram</Label>
+                      <Input
+                        id="instagram"
+                        value={profileData.instagram}
+                        onChange={(e) => handleInputChange('instagram', e.target.value)}
                         placeholder="@username"
                         className="border-input"
                       />

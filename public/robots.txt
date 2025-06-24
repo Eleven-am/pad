@@ -1,0 +1,21 @@
+# Robots.txt for Pad
+
+# Allow all crawlers
+User-agent: *
+Allow: /
+
+# Disallow admin/dashboard areas
+Disallow: /dashboard
+Disallow: /my-posts
+Disallow: /blogs/*/edit
+Disallow: /api/
+Disallow: /auth
+
+# Allow specific API endpoints for previews
+Allow: /api/og
+
+# Sitemap location
+Sitemap: /sitemap.xml
+
+# Crawl delay (optional - be respectful to crawlers)
+Crawl-delay: 1

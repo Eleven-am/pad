@@ -35,8 +35,6 @@ import { ProgressVariant, CollaboratorRole, RevisionType } from "@/generated/pri
 
 export async function unwrap<T>(result: Promise<PadResult<T>>): Promise<T> {
 	const res = await result;
-	console.log('Unwrapping result:', res);
-
 	if ('success' in res && res.success) {
 		return res.data;
 	}

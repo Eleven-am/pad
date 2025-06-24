@@ -9,6 +9,7 @@ export interface UpdateUserInput {
 	twitter?: string;
 	linkedin?: string;
 	github?: string;
+	instagram?: string;
 }
 
 interface UserStats {

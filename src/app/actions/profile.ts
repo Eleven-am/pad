@@ -46,6 +46,7 @@ export async function updateUserProfile(data: {
   twitter?: string;
   linkedin?: string;
   github?: string;
+  instagram?: string;
 }) {
   try {
     const session = await auth.api.getSession({

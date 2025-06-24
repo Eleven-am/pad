@@ -37,6 +37,7 @@ import {
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { useBlockPostActions, useBlockPostState } from "@/commands/CommandManager";
+import { useReadingTracker } from "@/hooks/useReadingTracker";
 
 interface AuthorWithAvatar {
 	id: string;
@@ -57,6 +58,7 @@ interface BlogArticleProps {
 	authorsPromise: Promise<{
 		allAuthors: AuthorWithAvatar[];
 	}>;
+	userId?: string | null;
 	className?: string;
 	isEditMode?: boolean;
 }
@@ -150,12 +152,20 @@ function SortableClickableBlock({ block, children }: { block: UnifiedBlockOutput
 	);
 }
 
-export function BlogArticle({ post, blocks: initialBlocks, tracker, analysis, avatarUrl, authorsPromise, className, isEditMode = false }: BlogArticleProps) {
+export function BlogArticle({ post, blocks: initialBlocks, tracker, analysis, avatarUrl, authorsPromise, userId, className, isEditMode = false }: BlogArticleProps) {
 	const blogRef = useRef<HTMLElement>(null);
 	const { moveBlocks } = useBlockPostActions();
 	const { blocks: stateBlocks } = useBlockPostState((state) => ({
 		blocks: state.blocks,
 	}));
+	
+	// Track reading progress (only when not in edit mode)
+	useReadingTracker({
+		postId: post.id,
+		userId: userId,
+		totalWordCount: analysis.wordCount,
+		enabled: !isEditMode && post.published, // Only track published posts when not editing
+	});
 	
 	// Use state blocks if in edit mode (where undo/redo matters), otherwise use initial blocks
 	const blocks = isEditMode && stateBlocks.length > 0 ? stateBlocks : initialBlocks;

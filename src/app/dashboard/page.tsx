@@ -1,4 +1,4 @@
-import { Dashboard } from "@/components/dashboard/dashboard";
+import { DashboardEnhanced } from "@/components/dashboard/dashboard-enhanced";
 import { getDashboardMetrics } from "@/lib/dashboard-data";
 import { auth } from "@/lib/better-auth/server";
 import { headers } from "next/headers";
@@ -15,5 +15,5 @@ export default async function DashboardPage() {
 
 	const metrics = await getDashboardMetrics(session.user.id);
 
-	return <Dashboard metrics={metrics} />;
+	return <DashboardEnhanced metrics={metrics} />;
 }

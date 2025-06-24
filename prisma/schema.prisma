@@ -30,6 +30,7 @@ model User {
   twitter  String?
   linkedin String?
   github   String?
+  instagram String?
 
   posts         Post[]
   postReads     PostRead[]
@@ -230,21 +231,28 @@ model PostRead {
   postId String
   post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
 
-  // Optional user tracking (null for anonymous reads)
-  userId String?
-  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+  // User Identification
+  userId      String? // For authenticated users
+  user        User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+  anonymousId String? // For anonymous users (from localStorage)
 
   // Tracking data
-  ipAddress String? // For anonymous tracking
+  ipAddress String? // For geo-location info
   userAgent String? // Browser info
   referrer  String? // Where they came from
   readAt    DateTime @default(now())
+  updatedAt DateTime @updatedAt // Track when record was last updated
 
   // Reading behavior
-  timeSpent   Int? // Seconds spent reading
-  scrollDepth Float? // Percentage of post scrolled (0.0 - 1.0)
-  completed   Boolean @default(false) // Did they reach the end?
+  timeSpent   Int     @default(0) // Seconds spent reading (cumulative)
+  scrollDepth Float   @default(0.0) // Max percentage scrolled (0.0 - 1.0)
+  completed   Boolean @default(false) // Did they complete reading?
 
+  // Constraints and Indexes
+  @@unique([postId, userId]) // One record per authenticated user per post
+  @@unique([postId, anonymousId]) // One record per anonymous session per post
+  @@index([postId, readAt]) // For time-series analytics on a post
+  @@index([completed]) // For filtering completed reads
   @@map("post_reads")
 }
 

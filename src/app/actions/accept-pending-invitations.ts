@@ -12,10 +12,11 @@ import { TaskEither, createUnauthorizedError, hasError } from '@eleven-am/fp';
 export async function acceptPendingInvitations() {
 	const hdrs = await headers();
 	
-	return TaskEither.tryCatch(
-		() => auth.api.getSession({ headers: hdrs }),
-		'Failed to get session'
-	)
+	return TaskEither
+		.tryCatch(
+			() => auth.api.getSession({ headers: hdrs }),
+			'Failed to get session'
+		)
 		.filter(
 			(session) => !!session?.user?.email && !!session?.user?.id,
 			() => createUnauthorizedError('User not authenticated')
@@ -34,9 +35,8 @@ export async function acceptPendingInvitations() {
 				: 'No pending invitations found'
 		}))
 		.toResult()
-		.then(result => {
+		.then((result) => {
 			if (hasError(result)) {
-				console.error('Failed to accept pending invitations:', result.error);
 				return {
 					success: false,
 					message: 'Failed to process invitations'

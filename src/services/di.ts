@@ -13,6 +13,7 @@ import { SiteConfigService } from "@/services/siteConfigService";
 import { PostExcerptService } from "@/services/postExcerptService";
 import { createEmailService } from "@/services/emailService";
 import { NewsletterService } from "@/services/newsletterService";
+import { ReadingAnalyticsService } from "@/services/readingAnalyticsService";
 
 const prisma = new PrismaClient();
 
@@ -45,3 +46,5 @@ export const siteConfigService = new SiteConfigService(prisma);
 export const postExcerptService = new PostExcerptService(prisma);
 
 export const newsletterService = new NewsletterService(prisma, emailService);
+
+export const readingAnalyticsService = new ReadingAnalyticsService(prisma);

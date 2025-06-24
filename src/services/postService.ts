@@ -532,6 +532,22 @@ export class PostService extends BaseService {
 	}
 	
 	/**
+	 * Ensures a post has an excerpt, generating one if needed
+	 * @param postId - The ID of the post
+	 * @param currentExcerpt - The current excerpt (if any)
+	 * @returns The excerpt (existing or generated)
+	 */
+	ensureExcerpt(postId: string, currentExcerpt?: string | null): TaskEither<string> {
+		if (currentExcerpt) {
+			return TaskEither.of(currentExcerpt);
+		}
+		
+		return this.generateExcerpt(postId)
+			.orElse(() => TaskEither.of(''))
+			.map(excerpt => excerpt || `Read this post on Pad - your professional blogging platform.`);
+	}
+	
+	/**
 	 * Generates excerpt from post content
 	 * @param postId - The ID of the post
 	 * @returns The excerpt
@@ -540,11 +556,44 @@ export class PostService extends BaseService {
 		const maxLength = this.POST_EXCERPT_MAX_LENGTH;
 		return this.contentService.getBlocksByPostId(postId)
 			.filterItems((block) => block.type === 'TEXT' && Boolean(block.data.text))
-			.mapItems((block) => (block.data as TextBlockData).text)
-			.map((blocks) => {
-				let excerpt = blocks.join(' ');
-				excerpt = excerpt.slice(0, maxLength).trim();
-				return excerpt.length < maxLength ? excerpt : excerpt + '...';
+			.mapItems((block) => {
+				const text = (block.data as TextBlockData).text;
+				// Strip markdown formatting for cleaner excerpts
+				return text
+					.replace(/[*_~`#]/g, '') // Remove markdown formatting
+					.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1') // Convert links to text
+					.replace(/\s+/g, ' ') // Normalize whitespace
+					.trim();
+			})
+			.map((paragraphs) => {
+				if (paragraphs.length === 0) {
+					return '';
+				}
+
+				// If first paragraph is short enough, use it as-is
+				const firstParagraph = paragraphs[0];
+				if (firstParagraph.length <= maxLength) {
+					return firstParagraph;
+				}
+
+				// Otherwise, try to truncate at sentence boundary
+				const sentences = firstParagraph.match(/[^.!?]+[.!?]+/g) || [firstParagraph];
+				let excerpt = '';
+				
+				for (const sentence of sentences) {
+					if ((excerpt + sentence).length <= maxLength) {
+						excerpt += sentence;
+					} else if (excerpt.length === 0) {
+						// First sentence is too long, truncate it
+						excerpt = sentence.slice(0, maxLength - 3).trim() + '...';
+						break;
+					} else {
+						// We have some complete sentences, stop here
+						break;
+					}
+				}
+
+				return excerpt.trim();
 			});
 	}
 	
