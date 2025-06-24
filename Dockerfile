@@ -28,7 +28,7 @@ ENV DATABASE_URL="file:./dev.db"
 
 # Generate Prisma client before building
 RUN npx prisma generate
-RUN npx prisma migrate deploy
+RUN npx prisma migrate reset
 
 # Now build the application
 RUN npm run build
