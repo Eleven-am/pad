@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useCallback } from 'react';
-import { cuid } from '@paralleldrive/cuid2';
+import { createId } from '@paralleldrive/cuid2';
 
 interface UseReadingTrackerProps {
   postId: string;
@@ -15,7 +15,7 @@ function getAnonymousId(): string {
   let anonymousId = localStorage.getItem(key);
   
   if (!anonymousId) {
-    anonymousId = cuid();
+    anonymousId = createId();
     localStorage.setItem(key, anonymousId);
   }
   
@@ -28,7 +28,6 @@ export function useReadingTracker({
   totalWordCount,
   enabled = true 
 }: UseReadingTrackerProps) {
-  const startTimeRef = useRef(Date.now());
   const maxScrollRef = useRef(0);
   const timeSpentRef = useRef(0);
   const lastTickRef = useRef(Date.now());

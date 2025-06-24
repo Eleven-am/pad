@@ -42,13 +42,13 @@ export async function generateMetadata({ params }: BlogPostProps): Promise<Metad
 		const modifiedTime = post.updatedAt.toISOString();
 		
 		return {
-			title: post.metaTitle || post.title,
-			description: post.metaDescription || excerpt,
+			title: post.title,
+			description:  excerpt,
 			keywords: post.focusKeyword ? [post.focusKeyword] : undefined,
 			authors: [{ name: post.author.name || 'Pad Author' }],
 			openGraph: {
-				title: post.metaTitle || post.title,
-				description: post.metaDescription || excerpt,
+				title: post.title,
+				description: excerpt,
 				type: 'article',
 				publishedTime,
 				modifiedTime,
@@ -63,8 +63,8 @@ export async function generateMetadata({ params }: BlogPostProps): Promise<Metad
 			},
 			twitter: {
 				card: ogImageUrl ? 'summary_large_image' : 'summary',
-				title: post.metaTitle || post.title,
-				description: post.metaDescription || excerpt,
+				title:  post.title,
+				description: excerpt,
 				images: ogImageUrl ? [ogImageUrl] : undefined,
 			},
 			robots: {

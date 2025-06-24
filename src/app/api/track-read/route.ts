@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { headers } from 'next/headers';
-import { prisma } from '@/lib/prisma';
 import { z } from 'zod';
+import {prisma} from "@/services/di";
 
 // Validation schema for the tracking payload
 const trackingSchema = z.object({
@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
     await prisma.$transaction(async (tx) => {
       // Try to find existing record
       const existingRead = await tx.postRead.findUnique({ 
-        where: whereClause as any // Type assertion needed due to union type
+        where: whereClause as Parameters<typeof tx.postRead.findUnique>[0]['where']
       });
 
       if (existingRead) {

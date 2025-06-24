@@ -15,7 +15,7 @@ import { createEmailService } from "@/services/emailService";
 import { NewsletterService } from "@/services/newsletterService";
 import { ReadingAnalyticsService } from "@/services/readingAnalyticsService";
 
-const prisma = new PrismaClient();
+export const prisma = new PrismaClient();
 
 export const mediaService = new MediaService(
 	prisma,

@@ -20,13 +20,9 @@ export async function GET(request: NextRequest) {
 
     if (postId) {
       // Get distribution for specific post
-      const result = await readingAnalyticsService.getReadingDistribution(postId).run();
+      const result = await readingAnalyticsService.getReadingDistribution(postId).toPromise();
       
-      if (result.isLeft()) {
-        return NextResponse.json({ error: result.getLeft() }, { status: 500 });
-      }
-
-      return NextResponse.json({ distribution: result.getRight() });
+      return NextResponse.json({ distribution: result });
     } else {
       // Return empty distribution when no specific post is provided
       // You could enhance this to aggregate across all user's posts

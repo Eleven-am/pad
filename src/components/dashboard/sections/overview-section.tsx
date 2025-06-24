@@ -13,7 +13,6 @@ import {
   BookOpen,
   Heart,
   Bookmark,
-  Clock
 } from "lucide-react";
 import Link from "next/link";
 

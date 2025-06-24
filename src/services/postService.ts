@@ -194,45 +194,37 @@ export class PostService extends BaseService {
 		return TaskEither
 			.tryCatch(
 				() => {
-					if (userId) {
-						// If userId is provided, get post if user is author/collaborator OR post is published
-						return this.prisma.post.findFirst({
-							where: {
-								slug,
-								OR: [
-									// Post is published and time has arrived
-									{
-										published: true,
-										publishedAt: { lte: new Date() }
-									},
-									// User is the author
-									{ authorId: userId },
-									// User is a collaborator
-									{
-										collaborators: {
-											some: { userId }
+					return this.prisma.post.findFirst({
+						where: {
+							OR: [
+								{
+									slug,
+									published: true,
+									publishedAt: { lte: new Date() }
+								},
+								{
+									slug,
+									OR: [
+										{
+											published: true,
+											publishedAt: { lte: new Date() }
+										},
+										{ authorId: userId },
+										{
+											collaborators: {
+												some: { userId }
+											}
 										}
-									}
-								]
-							},
-							include: this.getPostInclude(),
-						});
-					} else {
-						// No userId provided, only return published posts
-						return this.prisma.post.findFirst({
-							where: {
-								slug,
-								published: true,
-								publishedAt: { lte: new Date() }
-							},
-							include: this.getPostInclude(),
-						});
-					}
+									]
+								},
+							]
+						},
+						include: this.getPostInclude(),
+					});
 				},
-				'Failed to fetch post by slug'
 			)
 			.nonNullable('Post not found')
-			.map(post => this.transformToPostWithDetails(post));
+			.map((post) => this.transformToPostWithDetails(post));
 	}
 	
 	/**
@@ -300,7 +292,7 @@ export class PostService extends BaseService {
 	 * @param userId - The ID of the user scheduling the post
 	 * @returns The scheduled post with details
 	 */
-	schedulePost(id: string, scheduledAt: Date, _userId: string): TaskEither<PostWithDetails> {
+	schedulePost(id: string, scheduledAt: Date, userId: string): TaskEither<PostWithDetails> {
 		return TaskEither
 			.of(scheduledAt)
 			.filter(
@@ -320,7 +312,7 @@ export class PostService extends BaseService {
 					'Failed to schedule post'
 				)
 			))
-			.chain(() => this.getPostById(id, _userId));
+			.chain(() => this.getPostById(id, userId));
 	}
 	
 	/**
@@ -454,7 +446,7 @@ export class PostService extends BaseService {
 				}),
 				'Failed to fetch featured posts'
 			)
-			.map(posts => posts.map(post => this.transformToPostWithDetails(post)));
+			.map((posts) => posts.map(post => this.transformToPostWithDetails(post)));
 	}
 	
 	/**
@@ -1109,10 +1101,11 @@ export class PostService extends BaseService {
 					bio: true,
 					avatarFileId: true,
 					website: true,
-					twitter: true,
-					linkedin: true,
-					github: true,
-					avatarFile: true,
+									twitter: true,
+				linkedin: true,
+				github: true,
+				instagram: true,
+				avatarFile: true,
 				},
 			},
 			category: true,
