@@ -1,6 +1,6 @@
 {
   "name": "pad-cms",
-  "version": "0.0.18",
+  "version": "0.0.19",
   "private": false,
   "scripts": {
     "dev": "next dev --turbopack",
