@@ -24,6 +24,8 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
+ENV DATABASE_URL="file:./dev.db"
+
 # Generate Prisma client before building
 RUN npx prisma generate
 RUN npx prisma migrate deploy
