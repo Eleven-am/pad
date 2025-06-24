@@ -3,6 +3,7 @@
 import React from "react";
 import { DashboardMetrics } from '@/services/dashboardService';
 import { Plus, TrendingUp, Eye, FileText } from "lucide-react";
+import Link from "next/link";
 
 interface DashboardProps {
   metrics: DashboardMetrics;
@@ -66,7 +67,7 @@ export function Dashboard({ metrics }: DashboardProps) {
             </div>
           </div>
 
-          <div className="bg-gradient-to-br from-violet-500 to-purple-600 rounded-xl p-6 text-white">
+          <Link href={'/blogs/new'} className="bg-gradient-to-br from-violet-500 to-purple-600 rounded-xl p-6 text-white">
             <div className="flex items-center gap-3 mb-3">
               <Plus className="w-5 h-5" />
               <span className="text-sm text-white/80">Create</span>
@@ -77,7 +78,7 @@ export function Dashboard({ metrics }: DashboardProps) {
             <div className="text-xs text-white/60 mt-1">
               Start writing
             </div>
-          </div>
+          </Link>
         </div>
 
         {/* Content Overview */}
