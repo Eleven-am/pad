@@ -220,7 +220,7 @@ export class PostExcerptService extends BaseService {
 				}
 				
 				return {
-					title: post.title,
+					title: `${post.title} - ${post.author.name || 'Anonymous'}`,
 					description,
 					imageFileId,
 					imageAlt,

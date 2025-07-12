@@ -145,6 +145,10 @@ export const unpublishPost = canPublishPostCached(async (postId: string, userId:
 	return postService.unpublishPost(postId, userId).toResult();
 });
 
+export const toggleFeaturedPost = canPublishPostCached(async (postId: string, userId: string) => {
+	return postService.toggleFeaturedPost(postId, userId).toResult();
+});
+
 export const schedulePost = canPublishPostCached(async (postId: string, scheduledAt: Date, userId: string) => {
 	return postService.schedulePost(postId, scheduledAt, userId).toResult();
 });

@@ -27,10 +27,11 @@ import {
   Lock,
   Calendar,
   TrendingUp,
-  FileText
+  FileText,
+  Star
 } from "lucide-react";
 import Link from "next/link";
-import { getUserPostsWithStats, deletePost, publishPost, unpublishPost } from "@/lib/data";
+import { getUserPostsWithStats, deletePost, publishPost, unpublishPost, toggleFeaturedPost } from "@/lib/data";
 import { unwrap } from "@/lib/data";
 import { toast } from "sonner";
 import { getPostStatus, getPostStatusDisplay, type PostWithStatusFields } from "@/lib/post-status";
@@ -171,6 +172,17 @@ export function UserPostsManagement({ userId }: UserPostsManagementProps) {
     } catch (error) {
       console.error('Failed to toggle publish status:', error);
       toast.error('Failed to update post status');
+    }
+  };
+
+  const handleToggleFeatured = async (postId: string, currentlyFeatured: boolean, title: string) => {
+    try {
+      await unwrap(toggleFeaturedPost(postId, userId));
+      toast.success(`"${title}" ${currentlyFeatured ? 'removed from' : 'marked as'} featured`);
+      loadPosts(); // Reload the list
+    } catch (error) {
+      console.error('Failed to toggle featured status:', error);
+      toast.error('Failed to update featured status');
     }
   };
 
@@ -436,6 +448,12 @@ export function UserPostsManagement({ userId }: UserPostsManagementProps) {
                             Publish
                           </>
                         )}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => handleToggleFeatured(post.id, post.featured, post.title)}
+                      >
+                        <Star className={`h-4 w-4 mr-2 ${post.featured ? 'fill-current' : ''}`} />
+                        {post.featured ? 'Unfeature' : 'Feature'}
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem

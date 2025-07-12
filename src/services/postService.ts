@@ -275,6 +275,19 @@ export class PostService extends BaseService {
 			scheduledAt: null
 		}, userId);
 	}
+
+	/**
+	 * Toggles the featured status of a post
+	 * @param id - The ID of the post
+	 * @param userId - The ID of the user toggling the featured status
+	 * @returns The updated post with details
+	 */
+	toggleFeaturedPost(id: string, userId: string): TaskEither<PostWithDetails> {
+		return this.getPostById(id, userId)
+			.chain((post) => this.updatePost(id, {
+				featured: !post.featured
+			}, userId));
+	}
 	
 	/**
 	 * Schedules a post for future publishing
@@ -432,6 +445,63 @@ export class PostService extends BaseService {
 					take: limit,
 				}),
 				'Failed to fetch featured posts'
+			)
+			.map((posts) => posts.map(post => this.transformToPostWithDetails(post)));
+	}
+
+	/**
+	 * Gets most read posts from the last week
+	 * @param startDate - The start date for the query (typically 7 days ago)
+	 * @param limit - The number of posts to return
+	 * @returns The most read posts from the last week
+	 */
+	getMostReadPostsLastWeek(startDate: Date, limit = 4): TaskEither<PostWithDetails[]> {
+		return TaskEither
+			.tryCatch(
+				async () => {
+					// First get the post IDs with the most reads in the last week
+					const postReads = await this.prisma.postRead.groupBy({
+						by: ['postId'],
+						where: {
+							readAt: { gte: startDate },
+							post: {
+								published: true,
+								publishedAt: { lte: new Date() }
+							}
+						},
+						_count: {
+							postId: true
+						},
+						orderBy: {
+							_count: {
+								postId: 'desc'
+							}
+						},
+						take: limit
+					});
+
+					// Extract post IDs
+					const postIds = postReads.map(pr => pr.postId);
+
+					if (postIds.length === 0) {
+						return [];
+					}
+
+					// Fetch the full post details
+					const posts = await this.prisma.post.findMany({
+						where: {
+							id: { in: postIds }
+						},
+						include: this.getPostInclude()
+					});
+
+					// Sort posts to maintain the order from the read counts
+					const postMap = new Map(posts.map(post => [post.id, post]));
+					return postIds
+						.map(id => postMap.get(id))
+						.filter((post): post is DetailedPost => post !== undefined);
+				},
+				'Failed to fetch most read posts from last week'
 			)
 			.map((posts) => posts.map(post => this.transformToPostWithDetails(post)));
 	}

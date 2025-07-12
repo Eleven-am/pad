@@ -76,13 +76,29 @@ async function transformToHomepagePost(post: PostWithDetails): Promise<HomepageP
 }
 
 /**
- * Fetches featured posts for the homepage
+ * Fetches featured posts for the homepage (most read posts in the last week)
  */
-export async function getFeaturedPostsAction(limit: number = 5): Promise<HomepagePost[]> {
-  const result = await postService.getFeaturedPosts(limit).toResult();
+export async function getFeaturedPostsAction(limit: number = 4): Promise<HomepagePost[]> {
+  // Get the date from 7 days ago
+  const oneWeekAgo = new Date();
+  oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+  
+  // Query for most read posts in the last week
+  const result = await postService.getMostReadPostsLastWeek(oneWeekAgo, limit).toResult();
   
   if (hasError(result)) {
-    return [];
+    // Fallback to featured posts if no reads in last week
+    const featuredResult = await postService.getFeaturedPosts(limit).toResult();
+    
+    if (hasError(featuredResult)) {
+      return [];
+    }
+    
+    const transformedPosts = await Promise.all(
+      featuredResult.data.map((post) => transformToHomepagePost(post))
+    );
+    
+    return transformedPosts;
   }
   
   // Transform posts with enhanced excerpt data
@@ -151,8 +167,8 @@ export async function getRecentPostsAction(limit: number = 6): Promise<HomepageP
  */
 export async function getHomepageDataAction() {
   const [featured, trending] = await Promise.all([
-    getFeaturedPostsAction(5),
-    getTrendingPostsAction(6),
+    getFeaturedPostsAction(4),  // 4 posts: 1 hero + 3 featured grid
+    getTrendingPostsAction(8),  // 8 posts for the 4x2 recent grid
   ]);
   
   return {
