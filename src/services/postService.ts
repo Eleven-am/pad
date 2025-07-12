@@ -285,7 +285,8 @@ export class PostService extends BaseService {
 	toggleFeaturedPost(id: string, userId: string): TaskEither<PostWithDetails> {
 		return this.getPostById(id, userId)
 			.chain((post) => this.updatePost(id, {
-				featured: !post.featured
+				featured: !post.featured,
+				scheduledAt: null
 			}, userId));
 	}
 	
@@ -497,7 +498,7 @@ export class PostService extends BaseService {
 					const postMap = new Map(posts.map(post => [post.id, post]));
 					return postIds
 						.map(id => postMap.get(id))
-						.filter((post): post is DetailedPost => post !== undefined)
+						.filter((post) => post !== undefined)
 						.slice(0, limit); // Limit to requested number
 				},
 				'Failed to fetch most read posts from last week'

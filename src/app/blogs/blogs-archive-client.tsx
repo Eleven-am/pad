@@ -1,7 +1,7 @@
 "use client";
 
 import { Badge } from "@/components/ui/badge";
-import { Clock, User, ArrowUpRight, Search } from "lucide-react";
+import { Search } from "lucide-react";
 import Link from "next/link";
 import { memo, useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { HomepagePost } from "@/app/actions/homepage";

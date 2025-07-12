@@ -1,7 +1,6 @@
 "use client";
 
 import { Badge } from "@/components/ui/badge";
-import { Clock, User } from "lucide-react";
 import Link from "next/link";
 import { memo } from "react";
 import { useFileId } from "@/hooks/useFileId";

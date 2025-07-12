@@ -31,8 +31,7 @@ function BlogReadingProgress({
 }: BlogReadingProgressProps) {
 	const { scrollYProgress } = useScroll({
 		target: contentSelector as RefObject<HTMLElement>,
-		offset: ["start start", "end end"],
-		layoutEffect: false
+		offset: ["start start", "end end"]
 	})
 	
 	const scaleX = useSpring(scrollYProgress, {
