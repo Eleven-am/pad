@@ -106,7 +106,7 @@ export interface PostWithDetails extends Post {
  * Post-service class that handles all post-related operations
  */
 export class PostService extends BaseService {
-	private readonly POST_EXCERPT_MAX_LENGTH = 160;
+	private readonly POST_EXCERPT_MAX_LENGTH = 200;
 	
 	/**
 	 * Constructor

@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { headers } from 'next/headers';
 import { z } from 'zod';
 import {prisma} from "@/services/di";
+import { apiLogger } from '@/lib/logger';
 
-// Validation schema for the tracking payload
 const trackingSchema = z.object({
   postId: z.string().min(1),
   userId: z.string().nullable(),
@@ -15,30 +15,31 @@ const trackingSchema = z.object({
   referrer: z.string().nullable().optional(),
 });
 
-// Cap time spent to prevent outliers (30 minutes)
-const MAX_TIME_SPENT_SINGLE_SESSION = 30 * 60; // 30 minutes in seconds
+const MAX_TIME_SPENT_SINGLE_SESSION = 30 * 60;
 
 export async function POST(request: NextRequest) {
+  const requestId = request.headers.get('x-request-id') || crypto.randomUUID();
+  const logger = apiLogger.child({ requestId, endpoint: 'track-read' });
+  
   try {
-    // Handle both JSON and text content types (sendBeacon sends as text)
     const contentType = request.headers.get('content-type');
     let body;
     
     if (contentType?.includes('application/json')) {
       body = await request.json();
     } else {
-      // sendBeacon sends data as text
       const text = await request.text();
       try {
         body = JSON.parse(text);
       } catch {
+        logger.warn({ contentType }, 'Invalid JSON payload');
         return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
       }
     }
 
-    // Validate the payload
     const validationResult = trackingSchema.safeParse(body);
     if (!validationResult.success) {
+      logger.warn({ error: validationResult.error }, 'Invalid tracking payload');
       return NextResponse.json(
         { error: 'Invalid payload', details: validationResult.error.flatten() },
         { status: 400 }
@@ -47,38 +48,41 @@ export async function POST(request: NextRequest) {
 
     const data = validationResult.data;
 
-    // Must have either userId or anonymousId
     if (!data.userId && !data.anonymousId) {
+      logger.warn({ postId: data.postId }, 'Missing userId or anonymousId');
       return NextResponse.json(
         { error: 'Either userId or anonymousId must be provided' },
         { status: 400 }
       );
     }
 
-    // Get IP address from headers
     const headersList = await headers();
     const ipAddress = 
       headersList.get('x-forwarded-for')?.split(',')[0].trim() ||
       headersList.get('x-real-ip') ||
       null;
 
-    // Cap time spent to prevent outliers
     const cappedTimeSpent = Math.min(data.timeSpent, MAX_TIME_SPENT_SINGLE_SESSION);
+    
+    logger.info({ 
+      postId: data.postId, 
+      userId: data.userId, 
+      anonymousId: data.anonymousId, 
+      timeSpent: cappedTimeSpent,
+      scrollDepth: data.scrollDepth,
+      completed: data.completed
+    }, 'Tracking read activity');
 
-    // Determine the unique constraint for upsert
     const whereClause = data.userId
       ? { postId_userId: { postId: data.postId, userId: data.userId } }
       : { postId_anonymousId: { postId: data.postId, anonymousId: data.anonymousId! } };
 
-    // Use a transaction for atomic read-update
     await prisma.$transaction(async (tx) => {
-      // Try to find existing record
       const existingRead = await tx.postRead.findUnique({ 
         where: whereClause as Parameters<typeof tx.postRead.findUnique>[0]['where']
       });
 
       if (existingRead) {
-        // Update existing record
         await tx.postRead.update({
           where: { id: existingRead.id },
           data: {
@@ -90,9 +94,9 @@ export async function POST(request: NextRequest) {
             referrer: data.referrer || existingRead.referrer,
           },
         });
+        logger.debug({ postId: data.postId, existingReadId: existingRead.id }, 'Updated existing read record');
       } else {
-        // Create new record
-        await tx.postRead.create({
+        const newRead = await tx.postRead.create({
           data: {
             postId: data.postId,
             userId: data.userId,
@@ -105,18 +109,14 @@ export async function POST(request: NextRequest) {
             referrer: data.referrer,
           },
         });
+        logger.debug({ postId: data.postId, newReadId: newRead.id }, 'Created new read record');
       }
-
-      // Optional: Update post view count cache or trigger analytics events
-      // This could be done asynchronously in a background job for better performance
     });
 
-    // Return 204 No Content as recommended for beacon endpoints
     return new NextResponse(null, { status: 204 });
   } catch (error) {
-    console.error('Error tracking read:', error);
+    logger.error({ error }, 'Error tracking read');
     
-    // Don't expose internal errors to clients
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -32,6 +33,7 @@ import Link from "next/link";
 import { getUserPostsWithStats, deletePost, publishPost, unpublishPost } from "@/lib/data";
 import { unwrap } from "@/lib/data";
 import { toast } from "sonner";
+import { getPostStatus, getPostStatusDisplay, type PostWithStatusFields } from "@/lib/post-status";
 
 interface UserPost {
   id: string;
@@ -84,7 +86,41 @@ export function UserPostsManagement({ userId }: UserPostsManagementProps) {
   const [data, setData] = useState<UserPostsData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
-  const [filter, setFilter] = useState<"all" | "published" | "drafts">("all");
+  
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  
+  const filter = (searchParams.get('filter') as "all" | "published" | "drafts" | "scheduled") || "all";
+  
+  useEffect(() => {
+    const urlSearch = searchParams.get('search');
+    if (urlSearch) {
+      setSearchQuery(urlSearch);
+    }
+  }, [searchParams]);
+
+  const updateFilter = useCallback((newFilter: "all" | "published" | "drafts" | "scheduled") => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (newFilter === "all") {
+      params.delete('filter');
+    } else {
+      params.set('filter', newFilter);
+    }
+    const newUrl = params.toString() ? `?${params.toString()}` : '';
+    router.replace(`/my-posts${newUrl}`, { scroll: false });
+  }, [searchParams, router]);
+
+  const updateSearch = useCallback((newSearch: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (newSearch) {
+      params.set('search', newSearch);
+    } else {
+      params.delete('search');
+    }
+    const newUrl = params.toString() ? `?${params.toString()}` : '';
+    router.replace(`/my-posts${newUrl}`, { scroll: false });
+    setSearchQuery(newSearch);
+  }, [searchParams, router]);
 
   const loadPosts = useCallback(async (offset = 0) => {
     try {
@@ -138,17 +174,18 @@ export function UserPostsManagement({ userId }: UserPostsManagementProps) {
     }
   };
 
-  // Filter posts based on search and filter criteria
   const filteredPosts = data?.posts.filter(post => {
     const matchesSearch = !searchQuery || 
       post.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       post.excerpt?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       post.tags.some(tag => tag.name.toLowerCase().includes(searchQuery.toLowerCase()));
 
+    const postStatus = getPostStatus(post as PostWithStatusFields);
     const matchesFilter = 
       filter === "all" ||
-      (filter === "published" && post.published) ||
-      (filter === "drafts" && !post.published);
+      (filter === "published" && postStatus === "published") ||
+      (filter === "drafts" && postStatus === "draft") ||
+      (filter === "scheduled" && postStatus === "scheduled");
 
     return matchesSearch && matchesFilter;
   }) || [];
@@ -264,7 +301,7 @@ export function UserPostsManagement({ userId }: UserPostsManagementProps) {
             <Input
               placeholder="Search posts..."
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => updateSearch(e.target.value)}
               className="pl-9"
             />
           </div>
@@ -272,23 +309,30 @@ export function UserPostsManagement({ userId }: UserPostsManagementProps) {
             <Button
               variant={filter === "all" ? "default" : "outline"}
               size="sm"
-              onClick={() => setFilter("all")}
+              onClick={() => updateFilter("all")}
             >
               All
             </Button>
             <Button
               variant={filter === "published" ? "default" : "outline"}
               size="sm"
-              onClick={() => setFilter("published")}
+              onClick={() => updateFilter("published")}
             >
               Published
             </Button>
             <Button
               variant={filter === "drafts" ? "default" : "outline"}
               size="sm"
-              onClick={() => setFilter("drafts")}
+              onClick={() => updateFilter("drafts")}
             >
               Drafts
+            </Button>
+            <Button
+              variant={filter === "scheduled" ? "default" : "outline"}
+              size="sm"
+              onClick={() => updateFilter("scheduled")}
+            >
+              Scheduled
             </Button>
           </div>
         </div>
@@ -307,17 +351,22 @@ export function UserPostsManagement({ userId }: UserPostsManagementProps) {
                         </Link>
                       </CardTitle>
                       <div className="flex items-center gap-2">
-                        {post.published ? (
-                          <Badge variant="default" className="text-xs">
-                            <Globe className="h-3 w-3 mr-1" />
-                            Published
-                          </Badge>
-                        ) : (
-                          <Badge variant="secondary" className="text-xs">
-                            <Lock className="h-3 w-3 mr-1" />
-                            Draft
-                          </Badge>
-                        )}
+                        {(() => {
+                          const statusDisplay = getPostStatusDisplay(post as PostWithStatusFields);
+                          const icons = {
+                            published: Globe,
+                            scheduled: Calendar,
+                            draft: Lock
+                          };
+                          const IconComponent = icons[statusDisplay.status];
+                          
+                          return (
+                            <Badge variant={statusDisplay.variant} className="text-xs">
+                              <IconComponent className="h-3 w-3 mr-1" />
+                              {statusDisplay.label}
+                            </Badge>
+                          );
+                        })()}
                         {post.featured && (
                           <Badge variant="outline" className="text-xs">
                             <TrendingUp className="h-3 w-3 mr-1" />

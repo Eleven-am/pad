@@ -2,6 +2,7 @@ import {createBadRequestError, Http, TaskEither} from "@eleven-am/fp";
 import {MediaService} from "@/services/mediaService";
 import {BlockType, CreateInstagramBlockInput, UnifiedBlockOutput} from "@/services/types";
 import {ContentService} from "@/services/contentService";
+import { serviceLogger } from "@/lib/logger";
 
 interface InstagramPostResponse {
 	data: {
@@ -394,13 +395,12 @@ export class InstagramService {
 			
 			return null;
 		} catch (error) {
-			console.error('Error extracting shortcode:', error);
+			serviceLogger.error({ error, url }, 'Error extracting Instagram shortcode');
 			return null;
 		}
 	}
 	
 	private isValidInstagramShortcode(shortcode: string): boolean {
-		// Instagram shortcodes are typically 11 characters, alphanumeric + underscore + dash
 		const shortcodePattern = /^[A-Za-z0-9_-]{8,15}$/;
 		return shortcodePattern.test(shortcode);
 	}

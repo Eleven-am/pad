@@ -1,22 +1,16 @@
 import { PrismaClient } from '@/generated/prisma';
-
-/**
- * Initialize database with required data
- * This ensures the app can start even with a fresh database
- */
+import { systemLogger } from '@/lib/logger';
 export async function initializeDatabase() {
   const prisma = new PrismaClient();
   
   try {
-    console.log('🔧 Initializing database...');
+    systemLogger.info('Initializing database');
     
-    // Check if site config exists
     const existingConfig = await prisma.siteConfig.findFirst();
     
     if (!existingConfig) {
-      console.log('📝 Creating default site configuration...');
+      systemLogger.info('Creating default site configuration');
       
-      // Create default site config
       await prisma.siteConfig.create({
         data: {
           siteName: 'Pad',
@@ -39,29 +33,26 @@ export async function initializeDatabase() {
         },
       });
       
-      console.log('✅ Default site configuration created');
+      systemLogger.info('Default site configuration created');
     } else {
-      console.log('✅ Site configuration already exists');
+      systemLogger.info('Site configuration already exists');
     }
     
-    // You can add more initialization logic here
-    // For example: creating default categories, tags, etc.
     
-    console.log('✅ Database initialization complete');
+    systemLogger.info('Database initialization complete');
   } catch (error) {
-    console.error('❌ Database initialization failed:', error);
+    systemLogger.error({ error }, 'Database initialization failed');
     throw error;
   } finally {
     await prisma.$disconnect();
   }
 }
 
-// Run if this file is executed directly
 if (require.main === module) {
   initializeDatabase()
     .then(() => process.exit(0))
     .catch((error) => {
-      console.error(error);
+      systemLogger.error({ error }, 'Database initialization error');
       process.exit(1);
     });
 }

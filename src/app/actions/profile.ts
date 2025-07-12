@@ -4,6 +4,7 @@ import { userService } from '@/services/di';
 import { auth } from '@/lib/better-auth/server';
 import { headers } from 'next/headers';
 import { User } from '@/generated/prisma';
+import { authLogger } from '@/lib/logger';
 
 export interface ProfileData {
   user: Partial<User> & { avatarUrl?: string | null };
@@ -15,8 +16,9 @@ export interface ProfileData {
 }
 
 export async function getCurrentUserProfile(): Promise<ProfileData | null> {
+  let session;
   try {
-    const session = await auth.api.getSession({
+    session = await auth.api.getSession({
       headers: await headers(),
     });
 
@@ -34,7 +36,7 @@ export async function getCurrentUserProfile(): Promise<ProfileData | null> {
       stats: statsResult,
     };
   } catch (error) {
-    console.error('Failed to fetch user profile:', error);
+    authLogger.error({ error, userId: session?.user?.id }, 'Failed to fetch user profile');
     return null;
   }
 }
@@ -48,8 +50,9 @@ export async function updateUserProfile(data: {
   github?: string;
   instagram?: string;
 }) {
+  let session;
   try {
-    const session = await auth.api.getSession({
+    session = await auth.api.getSession({
       headers: await headers(),
     });
 
@@ -60,14 +63,15 @@ export async function updateUserProfile(data: {
     const result = await userService.updateProfile(session.user.id, data).toPromise();
     return { success: true, data: result };
   } catch (error) {
-    console.error('Failed to update profile:', error);
+    authLogger.error({ error, userId: session?.user?.id }, 'Failed to update profile');
     return { success: false, error: error instanceof Error ? error.message : 'Failed to update profile' };
   }
 }
 
 export async function uploadUserAvatar(formData: FormData) {
+  let session;
   try {
-    const session = await auth.api.getSession({
+    session = await auth.api.getSession({
       headers: await headers(),
     });
 
@@ -83,14 +87,15 @@ export async function uploadUserAvatar(formData: FormData) {
     const result = await userService.uploadAvatar(session.user.id, file).toPromise();
     return { success: true, data: result };
   } catch (error) {
-    console.error('Failed to upload avatar:', error);
+    authLogger.error({ error, userId: session?.user?.id }, 'Failed to upload avatar');
     return { success: false, error: error instanceof Error ? error.message : 'Failed to upload avatar' };
   }
 }
 
 export async function removeUserAvatar() {
+  let session;
   try {
-    const session = await auth.api.getSession({
+    session = await auth.api.getSession({
       headers: await headers(),
     });
 
@@ -101,7 +106,7 @@ export async function removeUserAvatar() {
     const result = await userService.removeAvatar(session.user.id).toPromise();
     return { success: true, data: result };
   } catch (error) {
-    console.error('Failed to remove avatar:', error);
+    authLogger.error({ error, userId: session?.user?.id }, 'Failed to remove avatar');
     return { success: false, error: error instanceof Error ? error.message : 'Failed to remove avatar' };
   }
 }

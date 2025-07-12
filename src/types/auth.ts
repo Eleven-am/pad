@@ -1,6 +1,5 @@
 import { Session } from "better-auth";
 
-// Basic user type returned by better-auth
 export interface BetterAuthUser {
   id: string;
   name: string;
@@ -15,7 +14,6 @@ export interface BetterAuthUser {
   banExpires?: Date | null;
 }
 
-// Extended user type with all fields from Prisma schema
 export interface AuthUser extends BetterAuthUser {
   bio: string | null;
   avatarFileId: string | null;
@@ -25,13 +23,11 @@ export interface AuthUser extends BetterAuthUser {
   github: string | null;
 }
 
-// Session type returned by auth.api.getSession
 export interface AuthSession {
   session: Session;
   user: BetterAuthUser;
 }
 
-// Full session type with extended user data
 export interface ExtendedAuthSession {
   session: Session;
   user: AuthUser;

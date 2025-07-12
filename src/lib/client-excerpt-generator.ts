@@ -35,6 +35,24 @@ export class ClientExcerptGenerator {
   }
 
   /**
+   * Extract first N characters from text
+   */
+  private static extractCharacters(text: string, charCount: number): string {
+    if (text.length <= charCount) {
+      return text;
+    }
+    
+    const truncated = text.slice(0, charCount);
+    const lastSpaceIndex = truncated.lastIndexOf(' ');
+    
+    if (lastSpaceIndex > charCount * 0.8) {
+      return truncated.slice(0, lastSpaceIndex) + '...';
+    }
+    
+    return truncated + '...';
+  }
+
+  /**
    * Calculate total word count from text blocks
    */
   private static calculateWordCount(textBlocks: Array<{ text: string }>): number {
@@ -80,21 +98,19 @@ export class ClientExcerptGenerator {
    * Generate excerpt from current blocks
    * Mirrors the server-side logic exactly
    */
-  static generateExcerpt(blocks: UnifiedBlockOutput[], wordLimit: number = 20): GeneratedExcerpt {
-    // Get text blocks for content extraction
+  static generateExcerpt(blocks: UnifiedBlockOutput[], charLimit: number = 200): GeneratedExcerpt {
     const textBlocks = this.getTextBlocks(blocks);
     
-    // Extract excerpt from first text block
     let excerptText = '';
     if (textBlocks.length > 0) {
-      const textContent = this.stripHtml(textBlocks[0].text);
-      excerptText = this.extractWords(textContent, wordLimit);
+      const combinedText = textBlocks
+        .map(block => this.stripHtml(block.text))
+        .join(' ');
+      excerptText = this.extractCharacters(combinedText, charLimit);
     }
 
-    // Find first image
     const { fileId: imageFileId, alt: imageAlt } = this.findFirstImage(blocks);
 
-    // Calculate total word count
     const wordCount = this.calculateWordCount(textBlocks);
 
     return {

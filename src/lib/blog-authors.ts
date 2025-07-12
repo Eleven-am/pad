@@ -23,22 +23,14 @@ export interface AuthorWithAvatar extends AuthorBase {
 	joinedAt?: Date | null;
 }
 
-/**
- * Get post authors with their avatar URLs
- * @param postId - The ID of the post
- * @returns Promise containing all authors with avatar URLs
- */
 export async function getAuthorsWithAvatars(postId: string): Promise<{ allAuthors: AuthorWithAvatar[] }> {
 	const authorsData = await unwrap(getPostAuthorsPublic(postId)) as AuthorsData;
 	const { owner, coAuthors } = authorsData;
-
-	console.log(authorsData);
 	
 	if (!owner) {
 		return { allAuthors: [] };
 	}
 
-	// Get avatar URLs for all authors
 	const ownerAvatarUrl = owner.avatarFile 
 		? await unwrap(getPublicUrl(owner.avatarFile.id)) as string 
 		: owner.image || null;

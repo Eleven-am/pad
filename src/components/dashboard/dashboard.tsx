@@ -84,20 +84,28 @@ export function Dashboard({ metrics }: DashboardProps) {
         {/* Content Overview */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
           <div className="bg-card border border-border rounded-xl p-6">
-            <h3 className="font-medium text-foreground mb-4">Content Status</h3>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-medium text-foreground">Content Status</h3>
+              <Link 
+                href="/my-posts" 
+                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                View all →
+              </Link>
+            </div>
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
+              <Link href="/my-posts?filter=published" className="flex items-center justify-between hover:bg-muted/50 -mx-2 px-2 py-1 rounded transition-colors">
                 <span className="text-sm text-muted-foreground">Published</span>
                 <span className="font-medium text-foreground">{metrics.posts.published}</span>
-              </div>
-              <div className="flex items-center justify-between">
+              </Link>
+              <Link href="/my-posts?filter=drafts" className="flex items-center justify-between hover:bg-muted/50 -mx-2 px-2 py-1 rounded transition-colors">
                 <span className="text-sm text-muted-foreground">Drafts</span>
                 <span className="font-medium text-foreground">{metrics.posts.drafts}</span>
-              </div>
-              <div className="flex items-center justify-between">
+              </Link>
+              <Link href="/my-posts?filter=scheduled" className="flex items-center justify-between hover:bg-muted/50 -mx-2 px-2 py-1 rounded transition-colors">
                 <span className="text-sm text-muted-foreground">Scheduled</span>
                 <span className="font-medium text-foreground">{metrics.posts.scheduled || 0}</span>
-              </div>
+              </Link>
             </div>
           </div>
 

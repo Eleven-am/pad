@@ -32,12 +32,10 @@ export async function generateMetadata({ params }: BlogPostProps): Promise<Metad
 		const post = await unwrap(getPostBySlugPublic(slug)) as PostWithDetails;
 		const excerpt = await postService.ensureExcerpt(post.id, post.excerpt).toPromise();
 		
-		// Get the Open Graph image URL if available
 		const ogImageUrl = post.excerptImageId 
 			? await unwrap(getPublicUrl(post.excerptImageId)) as string
 			: null;
 		
-		// Format publish date for metadata
 		const publishedTime = post.publishedAt?.toISOString();
 		const modifiedTime = post.updatedAt.toISOString();
 		
@@ -91,7 +89,6 @@ export async function generateMetadata({ params }: BlogPostProps): Promise<Metad
 export default async function Home({ params }: BlogPostProps) {
 	const { slug } = await params;
 	
-	// Check if user is authenticated to pass their ID
 	const session = await auth.api.getSession({
 		headers: await headers()
 	});
@@ -103,15 +100,12 @@ export default async function Home({ params }: BlogPostProps) {
 	const analysis = await unwrap(getContentAnalysisPublic(post.id)) as ContentAnalysis;
 	const avatarUrl =  post.author.avatarFileId ? await unwrap(getPublicUrl(post.author.avatarFileId)) as string : post.author.image || null;
 	
-	// Get excerpt for SEO
 	const excerpt = await postService.ensureExcerpt(post.id, post.excerpt).toPromise();
 	
-	// Get Open Graph image URL
 	const ogImageUrl = post.excerptImageId 
 		? await unwrap(getPublicUrl(post.excerptImageId)) as string
 		: null;
 	
-	// Create promise for authors data (don't await it)
 	const authorsPromise = getAuthorsWithAvatars(post.id);
 	
 	return (

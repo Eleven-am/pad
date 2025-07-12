@@ -1,6 +1,6 @@
 'use server';
 
-import { postService, dashboardService, postExcerptService } from '@/services/di';
+import { postService, dashboardService, postExcerptService, mediaService } from '@/services/di';
 import { PostWithDetails } from '@/services/postService';
 import { PostExcerpt } from '@/services/postExcerptService';
 import { hasError } from '@eleven-am/fp';
@@ -33,23 +33,29 @@ async function transformToHomepagePost(post: PostWithDetails): Promise<HomepageP
   const wordCount = post.excerpt ? post.excerpt.split(' ').length * 10 : 500; // Rough estimate
   const readTime = Math.max(1, Math.ceil(wordCount / wordsPerMinute));
 
-  // Fetch enhanced excerpt data
   let excerptData: PostExcerpt | null = null;
+  let excerptImageUrl: string | null = null;
   
   try {
     const excerptResult = await postExcerptService.getPostExcerpt(post.id).toResult();
     if (!hasError(excerptResult)) {
       excerptData = excerptResult.data;
+      
+      if (excerptData.imageFileId) {
+        const imageUrlResult = await mediaService.getPublicUrl(excerptData.imageFileId, 60).toResult();
+        if (!hasError(imageUrlResult)) {
+          excerptImageUrl = imageUrlResult.data;
+        }
+      }
     }
   } catch {
-    // Silently handle excerpt fetch errors - fallback to post excerpt
   }
 
   return {
     id: post.id,
     title: post.title,
     excerpt: excerptData?.excerpt || post.excerpt || null,
-    excerptImage: excerptData?.imageUrl || null, // This is already a URL from the service
+    excerptImage: excerptImageUrl,
     excerptByline: excerptData?.byline || null,
     isManualExcerpt: excerptData?.isManualExcerpt || false,
     author: {
@@ -64,7 +70,7 @@ async function transformToHomepagePost(post: PostWithDetails): Promise<HomepageP
       month: 'short',
       day: 'numeric',
     }) : '',
-    image: excerptData?.imageUrl || null, // Use the excerpt image as the main image
+    image: excerptImageUrl,
     slug: post.slug,
   };
 }

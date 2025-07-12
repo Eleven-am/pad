@@ -4,6 +4,7 @@ import { userService } from '@/services/di';
 import { auth } from '@/lib/better-auth/server';
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
+import { authLogger } from '@/lib/logger';
 
 export async function updateNotificationSettings(_settings: {
   emailComments: boolean;
@@ -11,8 +12,9 @@ export async function updateNotificationSettings(_settings: {
   emailWeeklyDigest: boolean;
   emailNewPosts: boolean;
 }) {
+  let session;
   try {
-    const session = await auth.api.getSession({
+    session = await auth.api.getSession({
       headers: await headers(),
     });
 
@@ -20,12 +22,10 @@ export async function updateNotificationSettings(_settings: {
       throw new Error('Not authenticated');
     }
 
-    // Update notification preferences
-    // This would typically update user preferences in the database
     
     return { success: true };
   } catch (error) {
-    console.error('Failed to update notification settings:', error);
+    authLogger.error({ error, userId: session?.user?.id }, 'Failed to update notification settings');
     return { success: false, error: error instanceof Error ? error.message : 'Failed to update notification settings' };
   }
 }
@@ -40,15 +40,11 @@ export async function deleteAccount() {
       throw new Error('Not authenticated');
     }
 
-    // Delete the user account and all associated data
     await userService.deleteUser(session.user.id).toPromise();
     
-    // Sign out the user after deletion
     await auth.api.signOut({
       headers: await headers(),
     });
-    
-    // Redirect to home page
     redirect('/');
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : 'Failed to delete account' };

@@ -3,59 +3,63 @@ import { auth } from '@/lib/better-auth/server';
 import { mediaService } from '@/services/di';
 import { MediaService } from '@/services/mediaService';
 import { createReadStream } from 'fs';
+import { fileLogger } from '@/lib/logger';
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ fileId: string }> }
 ) {
+  const requestId = request.headers.get('x-request-id') || crypto.randomUUID();
+  const logger = fileLogger.child({ requestId, endpoint: 'file-get' });
+  
   try {
     const { fileId } = await params;
     const { searchParams } = new URL(request.url);
     const token = searchParams.get('token');
     
-    // Validate token is provided
+    logger.info({ fileId, hasToken: !!token }, 'File access request');
+    
     if (!token) {
+      logger.warn({ fileId }, 'File access denied - no token provided');
       return NextResponse.json(
         { error: 'Access token required' },
         { status: 401 }
       );
     }
     
-    // Validate token
     const secret = process.env.FILE_ACCESS_SECRET || 'default-secret-change-in-production';
     const validation = MediaService.validateSecureToken(token, secret);
     
     if (!validation.valid) {
       if (validation.expired) {
+        logger.warn({ fileId, tokenFileId: validation.fileId }, 'File access denied - token expired');
         return NextResponse.json(
           { error: 'Access token expired' },
           { status: 401 }
         );
       }
+      logger.warn({ fileId, tokenFileId: validation.fileId }, 'File access denied - invalid token');
       return NextResponse.json(
         { error: 'Invalid access token' },
         { status: 401 }
       );
     }
     
-    // Verify token matches requested file
     if (validation.fileId !== fileId) {
+      logger.warn({ fileId, tokenFileId: validation.fileId }, 'File access denied - token mismatch');
       return NextResponse.json(
         { error: 'Token not valid for this file' },
         { status: 403 }
       );
     }
     
-    // Get file metadata
     const fileResult = await mediaService.getFile(fileId).toPromise();
-    
-    // Track file access
     await mediaService.trackFileAccess(fileId).toPromise();
     
-    // Create read stream
+    logger.info({ fileId, filename: fileResult.filename, mimeType: fileResult.mimeType, size: fileResult.size }, 'File served successfully');
+    
     const stream = createReadStream(fileResult.path);
     
-    // Convert Node stream to Web stream
     const webStream = new ReadableStream({
       start(controller) {
         stream.on('data', (chunk: Buffer) => {
@@ -70,17 +74,16 @@ export async function GET(
       },
     });
     
-    // Return file with appropriate headers
     return new NextResponse(webStream, {
       headers: {
         'Content-Type': fileResult.mimeType,
         'Content-Disposition': `inline; filename="${fileResult.filename}"`,
-        'Cache-Control': 'private, max-age=3600', // Private cache for 1 hour
+        'Cache-Control': 'private, max-age=3600',
       },
     });
     
   } catch (error) {
-    console.error('File retrieval error:', error);
+    logger.error({ error, fileId: (await params).fileId }, 'File retrieval error');
     return NextResponse.json(
       { error: 'File not found' },
       { status: 404 }
@@ -92,23 +95,29 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ fileId: string }> }
 ) {
+  const requestId = request.headers.get('x-request-id') || crypto.randomUUID();
+  const logger = fileLogger.child({ requestId, endpoint: 'file-delete' });
+  
   try {
     const { fileId } = await params;
     
-    // Check authentication
     const session = await auth.api.getSession({
       headers: request.headers,
     });
 
     if (!session?.user) {
+      logger.warn({ fileId }, 'File deletion denied - unauthorized');
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
       );
     }
 
-    // Delete the file
+    logger.info({ fileId, userId: session.user.id }, 'Deleting file');
+    
     const result = await mediaService.deleteFile(fileId, session.user.id).toPromise();
+    
+    logger.info({ fileId, filename: result.filename, userId: session.user.id }, 'File deleted successfully');
     
     return NextResponse.json({ 
       success: true, 
@@ -120,10 +129,10 @@ export async function DELETE(
     });
 
   } catch (error) {
-    console.error('File deletion error:', error);
+    const { fileId } = await params;
+    logger.error({ error, fileId }, 'File deletion error');
     
     if (error instanceof Error) {
-      // Handle specific error types
       if (error.message.includes('not found') || error.message.includes('unauthorized')) {
         return NextResponse.json(
           { error: 'File not found or access denied' },

@@ -10,10 +10,12 @@ import {
   unwrap 
 } from '@/lib/data';
 import { revalidatePath } from 'next/cache';
+import { authLogger } from '@/lib/logger';
 
 export async function promoteCollaboratorToCoAuthor(postId: string, collaboratorUserId: string) {
+  let session;
   try {
-    const session = await auth.api.getSession({
+    session = await auth.api.getSession({
       headers: await headers(),
     });
 
@@ -23,13 +25,12 @@ export async function promoteCollaboratorToCoAuthor(postId: string, collaborator
 
     await unwrap(promoteToCoAuthor(postId, collaboratorUserId, session.user.id));
     
-    // Revalidate relevant paths
     revalidatePath(`/blogs/[slug]/edit`, 'page');
     revalidatePath(`/blogs/[slug]`, 'page');
     
     return { success: true };
   } catch (error) {
-    console.error('Failed to promote to co-author:', error);
+    authLogger.error({ error, postId, collaboratorUserId, userId: session?.user?.id }, 'Failed to promote to co-author');
     return { 
       success: false, 
       error: error instanceof Error ? error.message : 'Failed to promote to co-author' 
@@ -38,8 +39,9 @@ export async function promoteCollaboratorToCoAuthor(postId: string, collaborator
 }
 
 export async function demoteCoAuthorToContributor(postId: string, coAuthorUserId: string) {
+  let session;
   try {
-    const session = await auth.api.getSession({
+    session = await auth.api.getSession({
       headers: await headers(),
     });
 
@@ -49,13 +51,12 @@ export async function demoteCoAuthorToContributor(postId: string, coAuthorUserId
 
     await unwrap(demoteFromCoAuthor(postId, coAuthorUserId, session.user.id));
     
-    // Revalidate relevant paths
     revalidatePath(`/blogs/[slug]/edit`, 'page');
     revalidatePath(`/blogs/[slug]`, 'page');
     
     return { success: true };
   } catch (error) {
-    console.error('Failed to demote from co-author:', error);
+    authLogger.error({ error, postId, coAuthorUserId, userId: session?.user?.id }, 'Failed to demote from co-author');
     return { 
       success: false, 
       error: error instanceof Error ? error.message : 'Failed to demote from co-author' 
@@ -68,7 +69,7 @@ export async function getPostAuthorsAction(postId: string) {
     const authors = await unwrap(getPostAuthors(postId));
     return { success: true, data: authors };
   } catch (error) {
-    console.error('Failed to get post authors:', error);
+    authLogger.error({ error, postId }, 'Failed to get post authors');
     return { 
       success: false, 
       error: error instanceof Error ? error.message : 'Failed to get post authors' 
@@ -92,7 +93,7 @@ export async function checkUserAuthorStatus(postId: string, userId?: string) {
     const userIsAuthor = await unwrap(isUserAuthor(postId, userId));
     return { success: true, data: { isAuthor: userIsAuthor } };
   } catch (error) {
-    console.error('Failed to check author status:', error);
+    authLogger.error({ error, postId, userId }, 'Failed to check author status');
     return { 
       success: false, 
       error: error instanceof Error ? error.message : 'Failed to check author status' 

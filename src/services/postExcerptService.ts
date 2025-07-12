@@ -6,23 +6,23 @@ export interface PostExcerpt {
 	id: string;
 	title: string;
 	slug: string;
-	excerpt: string; // Manual excerpt or auto-generated from first text block
-	imageUrl?: string; // Featured image or first image found
-	imageAlt?: string; // Alt text of featured/first image
-	byline?: string; // Custom byline/tagline
-	isManualExcerpt: boolean; // Whether excerpt is manually configured
+	excerpt: string;
+	imageFileId?: string;
+	imageAlt?: string;
+	byline?: string;
+	isManualExcerpt: boolean;
 	author: {
 		name: string;
 		avatar?: string;
 	};
 	publishedAt?: Date | null;
-	readTime: number; // Estimated read time in minutes
+	readTime: number;
 }
 
 export interface PostSEOData {
 	title: string;
-	description: string; // Longer excerpt for meta description
-	imageUrl?: string;
+	description: string;
+	imageFileId?: string;
 	imageAlt?: string;
 	publishedAt?: Date | null;
 	modifiedAt: Date;
@@ -61,7 +61,6 @@ export class PostExcerptService extends BaseService {
 						},
 						textBlocks: {
 							orderBy: {position: 'asc'},
-							take: 1,
 							select: {
 								text: true
 							}
@@ -73,6 +72,13 @@ export class PostExcerptService extends BaseService {
 								images: {
 									orderBy: {order: 'asc'},
 									take: 1,
+									include: {
+										file: {
+											select: {
+												id: true
+											}
+										}
+									}
 								}
 							}
 						}
@@ -90,28 +96,27 @@ export class PostExcerptService extends BaseService {
 				
 				const hasManualConfig = Boolean (post.excerpt || post.excerptImageId || post.excerptByline);
 				let excerpt = '';
-				let imageUrl: string | undefined;
+				let imageFileId: string | undefined;
 				let imageAlt: string | undefined;
 				let byline: string | undefined;
 				
 				if (hasManualConfig) {
-					// Use manual configuration
 					excerpt = post.excerpt || '';
 					byline = post.excerptByline || undefined;
-					imageUrl = post.excerptImageId || undefined;
+					imageFileId = post.excerptImageId || undefined;
 				}
 				
-				// Fallback to auto-generated content if no manual excerpt
 				if ( ! excerpt && post.textBlocks.length > 0) {
-					const textContent = this.stripHtml (post.textBlocks[0].text);
-					excerpt = this.extractWords (textContent, 20); // First 20 words
+					const combinedText = post.textBlocks
+						.map(block => this.stripHtml(block.text))
+						.join(' ');
+					excerpt = this.extractCharacters(combinedText, 200);
 				}
 				
 				const images = post.imagesBlocks.map ((img) => img.images).flat ();
 				
-				// Fallback to first image if no featured image
-				if ( ! imageUrl && images.length > 0) {
-					imageUrl = images[0].fileId;
+				if ( ! imageFileId && images.length > 0) {
+					imageFileId = images[0].file.id;
 					imageAlt = images[0].alt || 'Post image';
 				}
 				
@@ -124,7 +129,7 @@ export class PostExcerptService extends BaseService {
 					title: post.title,
 					slug: post.slug,
 					excerpt,
-					imageUrl,
+					imageFileId,
 					imageAlt,
 					byline,
 					isManualExcerpt: hasManualConfig,
@@ -170,7 +175,6 @@ export class PostExcerptService extends BaseService {
 						},
 						textBlocks: {
 							orderBy: {position: 'asc'},
-							take: 3, // Get first few text blocks for better description
 							select: {
 								text: true
 							}
@@ -185,7 +189,7 @@ export class PostExcerptService extends BaseService {
 									include: {
 										file: {
 											select: {
-												path: true
+												id: true
 											}
 										}
 									}
@@ -199,28 +203,26 @@ export class PostExcerptService extends BaseService {
 					throw new Error ('Post not found');
 				}
 				
-				// Create longer description from multiple text blocks
 				let description = '';
 				if (post.textBlocks.length > 0) {
 					const combinedText = post.textBlocks
 						.map (block => this.stripHtml (block.text))
 						.join (' ');
-					description = this.extractWords (combinedText, 50); // First 50 words for SEO
+					description = this.extractCharacters (combinedText, 300);
 				}
 				
-				// Get first image
-				let imageUrl: string | undefined;
+				let imageFileId: string | undefined;
 				let imageAlt: string | undefined;
 				if (post.imagesBlocks.length > 0 && post.imagesBlocks[0].images.length > 0) {
 					const firstImage = post.imagesBlocks[0].images[0];
-					imageUrl = firstImage.file.path;
+					imageFileId = firstImage.file.id;
 					imageAlt = firstImage.alt;
 				}
 				
 				return {
 					title: post.title,
 					description,
-					imageUrl,
+					imageFileId,
 					imageAlt,
 					publishedAt: post.publishedAt,
 					modifiedAt: post.updatedAt,
@@ -269,7 +271,7 @@ export class PostExcerptService extends BaseService {
 									include: {
 										file: {
 											select: {
-												path: true
+												id: true
 											}
 										}
 									}
@@ -283,19 +285,19 @@ export class PostExcerptService extends BaseService {
 					throw new Error ('Post not found');
 				}
 				
-				// Extract excerpt
 				let excerpt = '';
 				if (post.textBlocks.length > 0) {
-					const textContent = this.stripHtml (post.textBlocks[0].text);
-					excerpt = this.extractWords (textContent, 20);
+					const combinedText = post.textBlocks
+						.map(block => this.stripHtml(block.text))
+						.join(' ');
+					excerpt = this.extractCharacters(combinedText, 200);
 				}
 				
-				// Get first image
-				let imageUrl: string | undefined;
+				let imageFileId: string | undefined;
 				let imageAlt: string | undefined;
 				if (post.imagesBlocks.length > 0 && post.imagesBlocks[0].images.length > 0) {
 					const firstImage = post.imagesBlocks[0].images[0];
-					imageUrl = firstImage.file.path;
+					imageFileId = firstImage.file.id;
 					imageAlt = firstImage.alt;
 				}
 				
@@ -307,10 +309,10 @@ export class PostExcerptService extends BaseService {
 					title: post.title,
 					slug: post.slug,
 					excerpt,
-					imageUrl,
+					imageFileId,
 					imageAlt,
-					byline: undefined, // This method doesn't check for manual excerpts
-					isManualExcerpt: false, // Always auto-generated in this method
+					byline: undefined,
+					isManualExcerpt: false,
 					author: {
 						name: post.author.name || 'Anonymous',
 						avatar: post.author.avatarFile?.path
@@ -385,7 +387,6 @@ export class PostExcerptService extends BaseService {
 						},
 						textBlocks: {
 							orderBy: {position: 'asc'},
-							take: 1,
 							select: {
 								text: true
 							}
@@ -400,7 +401,7 @@ export class PostExcerptService extends BaseService {
 									include: {
 										file: {
 											select: {
-												path: true
+												id: true
 											}
 										}
 									}
@@ -415,19 +416,19 @@ export class PostExcerptService extends BaseService {
 				});
 				
 				return relatedPosts.map (post => {
-					// Extract excerpt
 					let excerpt = '';
 					if (post.textBlocks.length > 0) {
-						const textContent = this.stripHtml (post.textBlocks[0].text);
-						excerpt = this.extractWords (textContent, 20);
+						const combinedText = post.textBlocks
+							.map(block => this.stripHtml(block.text))
+							.join(' ');
+						excerpt = this.extractCharacters(combinedText, 200);
 					}
 					
-					// Get first image
-					let imageUrl: string | undefined;
+					let imageFileId: string | undefined;
 					let imageAlt: string | undefined;
 					if (post.imagesBlocks.length > 0 && post.imagesBlocks[0].images.length > 0) {
 						const firstImage = post.imagesBlocks[0].images[0];
-						imageUrl = firstImage.file.path;
+						imageFileId = firstImage.file.id;
 						imageAlt = firstImage.alt;
 					}
 					
@@ -439,10 +440,10 @@ export class PostExcerptService extends BaseService {
 						title: post.title,
 						slug: post.slug,
 						excerpt,
-						imageUrl,
+						imageFileId,
 						imageAlt,
-						byline: undefined, // This method doesn't check for manual excerpts
-						isManualExcerpt: false, // Always auto-generated in this method
+						byline: undefined,
+						isManualExcerpt: false,
 						author: {
 							name: post.author.name || 'Anonymous',
 							avatar: post.author.avatarFile?.path
@@ -470,6 +471,24 @@ export class PostExcerptService extends BaseService {
 		const words = text.split (/\s+/).filter (word => word.length > 0);
 		const selectedWords = words.slice (0, wordCount);
 		return selectedWords.join (' ') + (words.length > wordCount ? '...' : '');
+	}
+	
+	/**
+	 * Extract first N characters from text
+	 */
+	private extractCharacters (text: string, charCount: number): string {
+		if (text.length <= charCount) {
+			return text;
+		}
+		
+		const truncated = text.slice(0, charCount);
+		const lastSpaceIndex = truncated.lastIndexOf(' ');
+		
+		if (lastSpaceIndex > charCount * 0.8) {
+			return truncated.slice(0, lastSpaceIndex) + '...';
+		}
+		
+		return truncated + '...';
 	}
 	
 	/**

@@ -121,7 +121,14 @@ export class DashboardService extends BaseService {
       ),
       published: TaskEither.tryCatch(
         () => this.prisma.post.count({ 
-          where: { ...whereClause, published: true } 
+          where: { 
+            ...whereClause, 
+            published: true,
+            OR: [
+              { publishedAt: null },
+              { publishedAt: { lte: new Date() } }
+            ]
+          } 
         }),
         'Failed to count published posts'
       ),
@@ -133,7 +140,11 @@ export class DashboardService extends BaseService {
       ),
       scheduled: TaskEither.tryCatch(
         () => this.prisma.post.count({ 
-          where: { ...whereClause, published: false, scheduledAt: { not: null } } 
+          where: { 
+            ...whereClause, 
+            published: true, 
+            publishedAt: { gt: new Date() } 
+          } 
         }),
         'Failed to count scheduled posts'
       ),
@@ -354,6 +365,10 @@ export class DashboardService extends BaseService {
   getTopPosts(userId?: string, limit: number = 5): TaskEither<DashboardMetrics['topPosts']> {
     const whereClause = { 
       published: true,
+      OR: [
+        { publishedAt: null },
+        { publishedAt: { lte: new Date() } }
+      ],
       ...(userId ? { authorId: userId } : {})
     };
 
