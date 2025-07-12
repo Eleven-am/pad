@@ -463,11 +463,7 @@ export class PostService extends BaseService {
 					const postReads = await this.prisma.postRead.groupBy({
 						by: ['postId'],
 						where: {
-							readAt: { gte: startDate },
-							post: {
-								published: true,
-								publishedAt: { lte: new Date() }
-							}
+							readAt: { gte: startDate }
 						},
 						_count: {
 							postId: true
@@ -477,7 +473,7 @@ export class PostService extends BaseService {
 								postId: 'desc'
 							}
 						},
-						take: limit
+						take: limit * 2 // Get more in case some are unpublished
 					});
 
 					// Extract post IDs
@@ -487,10 +483,12 @@ export class PostService extends BaseService {
 						return [];
 					}
 
-					// Fetch the full post details
+					// Fetch the full post details (only published ones)
 					const posts = await this.prisma.post.findMany({
 						where: {
-							id: { in: postIds }
+							id: { in: postIds },
+							published: true,
+							publishedAt: { lte: new Date() }
 						},
 						include: this.getPostInclude()
 					});
@@ -499,7 +497,8 @@ export class PostService extends BaseService {
 					const postMap = new Map(posts.map(post => [post.id, post]));
 					return postIds
 						.map(id => postMap.get(id))
-						.filter((post): post is DetailedPost => post !== undefined);
+						.filter((post): post is DetailedPost => post !== undefined)
+						.slice(0, limit); // Limit to requested number
 				},
 				'Failed to fetch most read posts from last week'
 			)
